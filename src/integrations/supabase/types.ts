@@ -14,6 +14,51 @@ export type Database = {
   }
   public: {
     Tables: {
+      backtests: {
+        Row: {
+          created_at: string
+          end_date: string
+          id: string
+          max_drawdown: number | null
+          name: string
+          results: Json | null
+          sharpe_ratio: number | null
+          start_date: string
+          strategy_config: Json
+          symbol: string
+          total_return: number | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          end_date: string
+          id?: string
+          max_drawdown?: number | null
+          name: string
+          results?: Json | null
+          sharpe_ratio?: number | null
+          start_date: string
+          strategy_config: Json
+          symbol: string
+          total_return?: number | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          end_date?: string
+          id?: string
+          max_drawdown?: number | null
+          name?: string
+          results?: Json | null
+          sharpe_ratio?: number | null
+          start_date?: string
+          strategy_config?: Json
+          symbol?: string
+          total_return?: number | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       market_data_configs: {
         Row: {
           api_key_encrypted: string | null
@@ -80,27 +125,183 @@ export type Database = {
         }
         Relationships: []
       }
+      pending_users: {
+        Row: {
+          approved_at: string | null
+          approved_by: string | null
+          created_at: string
+          email: string
+          full_name: string | null
+          id: string
+          status: string
+          user_id: string
+        }
+        Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
+          created_at?: string
+          email: string
+          full_name?: string | null
+          id?: string
+          status?: string
+          user_id: string
+        }
+        Update: {
+          approved_at?: string | null
+          approved_by?: string | null
+          created_at?: string
+          email?: string
+          full_name?: string | null
+          id?: string
+          status?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      portfolio_positions: {
+        Row: {
+          asset_type: string
+          avg_entry_price: number
+          created_at: string
+          current_price: number | null
+          id: string
+          quantity: number
+          symbol: string
+          unrealized_pnl: number | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          asset_type?: string
+          avg_entry_price: number
+          created_at?: string
+          current_price?: number | null
+          id?: string
+          quantity: number
+          symbol: string
+          unrealized_pnl?: number | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          asset_type?: string
+          avg_entry_price?: number
+          created_at?: string
+          current_price?: number | null
+          id?: string
+          quantity?: number
+          symbol?: string
+          unrealized_pnl?: number | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      price_alerts: {
+        Row: {
+          alert_type: string
+          condition: string
+          created_at: string
+          id: string
+          is_active: boolean
+          symbol: string
+          target_price: number | null
+          triggered_at: string | null
+          user_id: string
+        }
+        Insert: {
+          alert_type: string
+          condition: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          symbol: string
+          target_price?: number | null
+          triggered_at?: string | null
+          user_id: string
+        }
+        Update: {
+          alert_type?: string
+          condition?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          symbol?: string
+          target_price?: number | null
+          triggered_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
+          autotrade_enabled: boolean
           created_at: string | null
           email: string | null
           full_name: string | null
           id: string
+          is_admin: boolean
           updated_at: string | null
         }
         Insert: {
+          autotrade_enabled?: boolean
           created_at?: string | null
           email?: string | null
           full_name?: string | null
           id: string
+          is_admin?: boolean
           updated_at?: string | null
         }
         Update: {
+          autotrade_enabled?: boolean
           created_at?: string | null
           email?: string | null
           full_name?: string | null
           id?: string
+          is_admin?: boolean
           updated_at?: string | null
+        }
+        Relationships: []
+      }
+      trades: {
+        Row: {
+          action: string
+          closed_at: string | null
+          created_at: string
+          entry_price: number
+          exit_price: number | null
+          id: string
+          pnl: number | null
+          quantity: number
+          status: string
+          symbol: string
+          user_id: string
+        }
+        Insert: {
+          action: string
+          closed_at?: string | null
+          created_at?: string
+          entry_price: number
+          exit_price?: number | null
+          id?: string
+          pnl?: number | null
+          quantity: number
+          status?: string
+          symbol: string
+          user_id: string
+        }
+        Update: {
+          action?: string
+          closed_at?: string | null
+          created_at?: string
+          entry_price?: number
+          exit_price?: number | null
+          id?: string
+          pnl?: number | null
+          quantity?: number
+          status?: string
+          symbol?: string
+          user_id?: string
         }
         Relationships: []
       }

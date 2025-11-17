@@ -1,20 +1,33 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { MarketData } from "@/components/MarketData";
 import { SentimentAnalysis } from "@/components/SentimentAnalysis";
 import { TradingSignal } from "@/components/TradingSignal";
 import { RiskManager } from "@/components/RiskManager";
 import { OrderEntry } from "@/components/OrderEntry";
 import { Watchlist } from "@/components/Watchlist";
+import { Portfolio } from "@/components/Portfolio";
+import { TradingHistory } from "@/components/TradingHistory";
+import { Backtesting } from "@/components/Backtesting";
+import { PriceAlerts } from "@/components/PriceAlerts";
+import { AdminApproval } from "@/components/AdminApproval";
 import { Activity, Settings as SettingsIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 
 const Index = () => {
   const [accountSize, setAccountSize] = useState(10000);
   const [riskPerTrade, setRiskPerTrade] = useState(2);
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, signOut } = useAuth();
+  const { toast } = useToast();
+  const [autotradeEnabled, setAutotradeEnabled] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   const [watchlistItems, setWatchlistItems] = useState([
     { symbol: "AAPL", price: 187.35, change: 2.45 },
@@ -22,6 +35,46 @@ const Index = () => {
     { symbol: "GOOGL", price: 141.23, change: 1.15 },
     { symbol: "TSLA", price: 242.68, change: 5.32 },
   ]);
+
+  useEffect(() => {
+    if (user) {
+      fetchProfile();
+    }
+  }, [user]);
+
+  const fetchProfile = async () => {
+    const { data } = await supabase
+      .from("profiles")
+      .select("autotrade_enabled, is_admin")
+      .eq("id", user?.id)
+      .single();
+
+    if (data) {
+      setAutotradeEnabled(data.autotrade_enabled);
+      setIsAdmin(data.is_admin);
+    }
+  };
+
+  const toggleAutotrade = async (checked: boolean) => {
+    const { error } = await supabase
+      .from("profiles")
+      .update({ autotrade_enabled: checked })
+      .eq("id", user?.id);
+
+    if (error) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    } else {
+      setAutotradeEnabled(checked);
+      toast({
+        title: checked ? "Autotrade Enabled" : "Autotrade Disabled",
+        description: checked ? "Automatic trading is now active" : "Automatic trading is now disabled",
+      });
+    }
+  };
 
   const handleRemoveFromWatchlist = (symbol: string) => {
     setWatchlistItems(items => items.filter(item => item.symbol !== symbol));
@@ -39,64 +92,97 @@ const Index = () => {
           <div className="flex items-center gap-3">
             <Activity className="h-8 w-8 text-primary" />
             <div>
-              <h1 className="text-3xl font-bold">Trading Bot Dashboard</h1>
-              <p className="text-sm text-muted-foreground">
-                Automated market analysis and trading signals • {user?.email}
-              </p>
+              <h1 className="text-3xl font-bold">Trading Dashboard</h1>
+              <p className="text-sm text-muted-foreground">{user?.email}</p>
             </div>
           </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => navigate("/settings")}
-          >
-            <SettingsIcon className="h-4 w-4 mr-2" />
-            Settings
-          </Button>
-        </div>
-
-        {/* Main Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Left Column - Market Data */}
-          <div className="space-y-6">
-            <MarketData symbol="AAPL" />
-            
-            <SentimentAnalysis
-              score={0.68}
-              articles={247}
-              lastUpdate="2 min ago"
-            />
-
-            <Watchlist
-              items={watchlistItems}
-              onRemove={handleRemoveFromWatchlist}
-              onSelect={handleSelectSymbol}
-            />
-          </div>
-
-          {/* Middle Column - Signals */}
-          <div className="space-y-6">
-            <TradingSignal
-              signal="BUY"
-              confidence={87}
-              reason="Strong bullish sentiment combined with positive price momentum and increasing volume"
-              targetPrice={195.50}
-              stopLoss={182.30}
-            />
-
-            <RiskManager
-              accountSize={accountSize}
-              onAccountSizeChange={setAccountSize}
-              riskPerTrade={riskPerTrade}
-              onRiskPerTradeChange={setRiskPerTrade}
-            />
-          </div>
-
-          {/* Right Column - Order Entry */}
-          <div>
-            <OrderEntry />
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 border-r border-border pr-3">
+              <Switch
+                id="autotrade"
+                checked={autotradeEnabled}
+                onCheckedChange={toggleAutotrade}
+              />
+              <Label htmlFor="autotrade" className="cursor-pointer">
+                Autotrade {autotradeEnabled ? 'ON' : 'OFF'}
+              </Label>
+            </div>
+            <Button variant="outline" onClick={() => navigate("/settings")}>
+              <SettingsIcon className="h-4 w-4 mr-2" />
+              Settings
+            </Button>
+            <Button variant="outline" onClick={signOut}>
+              Sign Out
+            </Button>
           </div>
         </div>
+
+        {/* Main Content */}
+        <Tabs defaultValue="overview" className="space-y-6">
+          <TabsList className="grid w-full grid-cols-6">
+            <TabsTrigger value="overview">Overview</TabsTrigger>
+            <TabsTrigger value="portfolio">Portfolio</TabsTrigger>
+            <TabsTrigger value="history">History</TabsTrigger>
+            <TabsTrigger value="backtest">Backtest</TabsTrigger>
+            <TabsTrigger value="alerts">Alerts</TabsTrigger>
+            {isAdmin && <TabsTrigger value="admin">Admin</TabsTrigger>}
+          </TabsList>
+
+          <TabsContent value="overview" className="space-y-6">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <MarketData symbol="AAPL" />
+              <TradingSignal
+                signal="BUY"
+                confidence={87}
+                reason="Strong bullish sentiment combined with positive price momentum"
+                targetPrice={195.50}
+                stopLoss={182.30}
+              />
+              <SentimentAnalysis
+                score={0.68}
+                articles={247}
+                lastUpdate="2 min ago"
+              />
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <RiskManager
+                accountSize={accountSize}
+                onAccountSizeChange={setAccountSize}
+                riskPerTrade={riskPerTrade}
+                onRiskPerTradeChange={setRiskPerTrade}
+              />
+              <OrderEntry />
+              <Watchlist
+                items={watchlistItems}
+                onRemove={handleRemoveFromWatchlist}
+                onSelect={handleSelectSymbol}
+              />
+            </div>
+          </TabsContent>
+
+          <TabsContent value="portfolio">
+            <Portfolio />
+          </TabsContent>
+
+          <TabsContent value="history">
+            <TradingHistory />
+          </TabsContent>
+
+          <TabsContent value="backtest">
+            <Backtesting />
+          </TabsContent>
+
+          <TabsContent value="alerts">
+            <PriceAlerts />
+          </TabsContent>
+
+          {isAdmin && (
+            <TabsContent value="admin">
+              <AdminApproval />
+            </TabsContent>
+          )}
+        </Tabs>
       </div>
     </div>
   );
