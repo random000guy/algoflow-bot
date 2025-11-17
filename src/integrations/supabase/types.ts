@@ -125,6 +125,86 @@ export type Database = {
         }
         Relationships: []
       }
+      paper_trading_accounts: {
+        Row: {
+          created_at: string
+          current_balance: number
+          id: string
+          name: string
+          starting_balance: number
+          total_pnl: number | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          current_balance?: number
+          id?: string
+          name: string
+          starting_balance?: number
+          total_pnl?: number | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          current_balance?: number
+          id?: string
+          name?: string
+          starting_balance?: number
+          total_pnl?: number | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      paper_trading_positions: {
+        Row: {
+          account_id: string
+          closed_at: string | null
+          created_at: string
+          current_price: number | null
+          entry_price: number
+          id: string
+          pnl: number | null
+          quantity: number
+          status: string
+          symbol: string
+        }
+        Insert: {
+          account_id: string
+          closed_at?: string | null
+          created_at?: string
+          current_price?: number | null
+          entry_price: number
+          id?: string
+          pnl?: number | null
+          quantity: number
+          status?: string
+          symbol: string
+        }
+        Update: {
+          account_id?: string
+          closed_at?: string | null
+          created_at?: string
+          current_price?: number | null
+          entry_price?: number
+          id?: string
+          pnl?: number | null
+          quantity?: number
+          status?: string
+          symbol?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "paper_trading_positions_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "paper_trading_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pending_users: {
         Row: {
           approved_at: string | null
@@ -260,6 +340,39 @@ export type Database = {
           id?: string
           is_admin?: boolean
           updated_at?: string | null
+        }
+        Relationships: []
+      }
+      strategies: {
+        Row: {
+          config: Json
+          created_at: string
+          description: string | null
+          id: string
+          is_active: boolean | null
+          name: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          config: Json
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          config?: Json
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          updated_at?: string
+          user_id?: string
         }
         Relationships: []
       }
