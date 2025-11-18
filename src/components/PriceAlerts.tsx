@@ -75,7 +75,7 @@ export const PriceAlerts = () => {
     } else {
       toast({
         title: "Alert Created",
-        description: "You'll be notified when conditions are met",
+        description: "You'll receive email notifications when the alert is triggered",
       });
       setNewAlert({ symbol: "", alertType: "price", targetPrice: "", condition: "above" });
       fetchAlerts();

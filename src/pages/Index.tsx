@@ -10,6 +10,9 @@ import { TradingHistory } from "@/components/TradingHistory";
 import { Backtesting } from "@/components/Backtesting";
 import { PriceAlerts } from "@/components/PriceAlerts";
 import { AdminApproval } from "@/components/AdminApproval";
+import { StrategyBuilder } from "@/components/StrategyBuilder";
+import { PaperTrading } from "@/components/PaperTrading";
+import { AdvancedChart } from "@/components/AdvancedChart";
 import { Activity, Settings as SettingsIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -119,12 +122,15 @@ const Index = () => {
 
         {/* Main Content */}
         <Tabs defaultValue="overview" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-6">
+          <TabsList className="w-full flex flex-wrap justify-start gap-1">
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="portfolio">Portfolio</TabsTrigger>
             <TabsTrigger value="history">History</TabsTrigger>
             <TabsTrigger value="backtest">Backtest</TabsTrigger>
             <TabsTrigger value="alerts">Alerts</TabsTrigger>
+            <TabsTrigger value="strategy">Strategy Builder</TabsTrigger>
+            <TabsTrigger value="paper">Paper Trading</TabsTrigger>
+            <TabsTrigger value="charts">Advanced Charts</TabsTrigger>
             {isAdmin && <TabsTrigger value="admin">Admin</TabsTrigger>}
           </TabsList>
 
@@ -175,6 +181,18 @@ const Index = () => {
 
           <TabsContent value="alerts">
             <PriceAlerts />
+          </TabsContent>
+
+          <TabsContent value="strategy">
+            <StrategyBuilder />
+          </TabsContent>
+
+          <TabsContent value="paper">
+            <PaperTrading />
+          </TabsContent>
+
+          <TabsContent value="charts">
+            <AdvancedChart />
           </TabsContent>
 
           {isAdmin && (
