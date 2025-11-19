@@ -13,7 +13,7 @@ import { AdminApproval } from "@/components/AdminApproval";
 import { StrategyBuilder } from "@/components/StrategyBuilder";
 import { PaperTrading } from "@/components/PaperTrading";
 import { AdvancedChart } from "@/components/AdvancedChart";
-import { Activity, Settings as SettingsIcon } from "lucide-react";
+import { Activity, Settings as SettingsIcon, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
@@ -22,6 +22,8 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { useMarketData } from "@/hooks/useMarketData";
 
 const Index = () => {
   const [accountSize, setAccountSize] = useState(10000);
@@ -31,6 +33,7 @@ const Index = () => {
   const { toast } = useToast();
   const [autotradeEnabled, setAutotradeEnabled] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
+  const { error: marketDataError } = useMarketData("AAPL");
 
   const [watchlistItems, setWatchlistItems] = useState([
     { symbol: "AAPL", price: 187.35, change: 2.45 },
@@ -119,6 +122,23 @@ const Index = () => {
             </Button>
           </div>
         </div>
+
+        {/* Market Data Info Banner */}
+        {marketDataError && (
+          <Alert className="border-primary/20 bg-primary/5">
+            <Info className="h-4 w-4 text-primary" />
+            <AlertDescription className="text-sm">
+              <strong>Demo data is being displayed.</strong> To view live market data, configure a market data provider in{" "}
+              <button 
+                onClick={() => navigate("/settings")}
+                className="font-semibold underline hover:text-primary transition-colors"
+              >
+                Settings
+              </button>
+              .
+            </AlertDescription>
+          </Alert>
+        )}
 
         {/* Main Content */}
         <Tabs defaultValue="overview" className="space-y-6">
