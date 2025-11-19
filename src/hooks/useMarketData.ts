@@ -24,6 +24,15 @@ export const useMarketData = (symbol: string, refreshInterval = 60000) => {
     setError(null);
 
     try {
+      // Ensure user is authenticated before calling the edge function
+      const { data: sessionData } = await supabase.auth.getSession();
+      if (!sessionData.session) {
+        setError("User not authenticated");
+        setData(null);
+        setLoading(false);
+        return;
+      }
+
       const { data: functionData, error: functionError } = await supabase.functions.invoke(
         'fetch-market-data',
         {
