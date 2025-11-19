@@ -2,6 +2,7 @@ import { Card } from "@/components/ui/card";
 import { TrendingUp, TrendingDown, Activity, RefreshCw } from "lucide-react";
 import { useMarketData } from "@/hooks/useMarketData";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 
 interface MarketDataProps {
   symbol: string;
@@ -23,11 +24,16 @@ export const MarketData = ({ symbol }: MarketDataProps) => {
     <Card className="p-4 bg-card border-border hover:border-primary/50 transition-all duration-300">
       <div className="flex items-start justify-between">
         <div className="space-y-1">
-          <p className="text-sm text-muted-foreground">Symbol</p>
+          <div className="flex items-center gap-2">
+            <p className="text-sm text-muted-foreground">Symbol</p>
+            <Badge 
+              variant={error ? "secondary" : "default"}
+              className="text-xs"
+            >
+              {error ? "Demo" : "Live"}
+            </Badge>
+          </div>
           <p className="text-xl font-bold font-mono">{symbol}</p>
-          {error && (
-            <p className="text-xs text-muted-foreground">Using demo data</p>
-          )}
         </div>
         <div className="flex items-center gap-2">
           <Button

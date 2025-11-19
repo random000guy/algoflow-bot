@@ -13,6 +13,7 @@ import { AdminApproval } from "@/components/AdminApproval";
 import { StrategyBuilder } from "@/components/StrategyBuilder";
 import { PaperTrading } from "@/components/PaperTrading";
 import { AdvancedChart } from "@/components/AdvancedChart";
+import { NewsArticles } from "@/components/NewsArticles";
 import { Activity, Settings as SettingsIcon, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -148,6 +149,7 @@ const Index = () => {
             <TabsTrigger value="history">History</TabsTrigger>
             <TabsTrigger value="backtest">Backtest</TabsTrigger>
             <TabsTrigger value="alerts">Alerts</TabsTrigger>
+            <TabsTrigger value="news">News</TabsTrigger>
             <TabsTrigger value="strategy">Strategy Builder</TabsTrigger>
             <TabsTrigger value="paper">Paper Trading</TabsTrigger>
             <TabsTrigger value="charts">Advanced Charts</TabsTrigger>
@@ -213,6 +215,10 @@ const Index = () => {
 
           <TabsContent value="charts">
             <AdvancedChart />
+          </TabsContent>
+
+          <TabsContent value="news">
+            <NewsArticles symbol="AAPL" />
           </TabsContent>
 
           {isAdmin && (
