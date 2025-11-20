@@ -2,9 +2,12 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Eye, TrendingUp, TrendingDown, X, Plus } from "lucide-react";
-import { useState } from "react";
+import { Eye, TrendingUp, TrendingDown, X, Plus, Search } from "lucide-react";
+import { useState, useMemo } from "react";
 import { toast } from "sonner";
+import { POPULAR_STOCKS } from "@/data/popularStocks";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 interface WatchlistItem {
   symbol: string;
@@ -22,22 +25,22 @@ interface WatchlistProps {
 export const Watchlist = ({ items, onRemove, onSelect, onAdd }: WatchlistProps) => {
   const [newSymbol, setNewSymbol] = useState("");
   const [isAdding, setIsAdding] = useState(false);
+  const [open, setOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
 
-  const handleAdd = async () => {
-    const symbol = newSymbol.trim().toUpperCase();
-    
+  const filteredStocks = useMemo(() => {
+    if (!searchQuery) return POPULAR_STOCKS;
+    const query = searchQuery.toLowerCase();
+    return POPULAR_STOCKS.filter(
+      (stock) =>
+        stock.symbol.toLowerCase().includes(query) ||
+        stock.name.toLowerCase().includes(query)
+    );
+  }, [searchQuery]);
+
+  const handleAdd = async (symbol: string) => {
     if (!symbol) {
-      toast.error("Please enter a stock symbol");
-      return;
-    }
-
-    if (symbol.length !== 4) {
-      toast.error("Stock symbol must be 4 characters");
-      return;
-    }
-
-    if (!/^[A-Z]{4}$/.test(symbol)) {
-      toast.error("Stock symbol must contain only letters");
+      toast.error("Please select a stock symbol");
       return;
     }
 
@@ -45,6 +48,8 @@ export const Watchlist = ({ items, onRemove, onSelect, onAdd }: WatchlistProps) 
     try {
       await onAdd(symbol);
       setNewSymbol("");
+      setSearchQuery("");
+      setOpen(false);
       toast.success(`Added ${symbol} to watchlist`);
     } catch (error: any) {
       toast.error(error.message || "Failed to add symbol");
@@ -63,22 +68,51 @@ export const Watchlist = ({ items, onRemove, onSelect, onAdd }: WatchlistProps) 
         </Badge>
       </div>
 
-      <div className="flex gap-2 mb-4">
-        <Input
-          placeholder="Enter 4-letter symbol (e.g., AAPL)"
-          value={newSymbol}
-          onChange={(e) => setNewSymbol(e.target.value.toUpperCase())}
-          onKeyDown={(e) => e.key === "Enter" && handleAdd()}
-          maxLength={4}
-          className="font-mono"
-        />
-        <Button 
-          onClick={handleAdd} 
-          disabled={isAdding}
-          size="icon"
-        >
-          <Plus className="h-4 w-4" />
-        </Button>
+      <div className="mb-4">
+        <Popover open={open} onOpenChange={setOpen}>
+          <PopoverTrigger asChild>
+            <Button
+              variant="outline"
+              role="combobox"
+              aria-expanded={open}
+              className="w-full justify-between"
+              disabled={isAdding}
+            >
+              <Search className="h-4 w-4 mr-2" />
+              {newSymbol || "Search and add stock..."}
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-full p-0" align="start">
+            <Command>
+              <CommandInput
+                placeholder="Search stocks..."
+                value={searchQuery}
+                onValueChange={setSearchQuery}
+              />
+              <CommandList>
+                <CommandEmpty>No stocks found.</CommandEmpty>
+                <CommandGroup heading="Popular Stocks">
+                  {filteredStocks.map((stock) => (
+                    <CommandItem
+                      key={stock.symbol}
+                      value={stock.symbol}
+                      onSelect={() => {
+                        setNewSymbol(stock.symbol);
+                        handleAdd(stock.symbol);
+                      }}
+                      className="cursor-pointer"
+                    >
+                      <div className="flex flex-col">
+                        <span className="font-bold font-mono">{stock.symbol}</span>
+                        <span className="text-xs text-muted-foreground">{stock.name}</span>
+                      </div>
+                    </CommandItem>
+                  ))}
+                </CommandGroup>
+              </CommandList>
+            </Command>
+          </PopoverContent>
+        </Popover>
       </div>
 
       <div className="space-y-2">
