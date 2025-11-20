@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Newspaper, ExternalLink, RefreshCw } from "lucide-react";
+import { Newspaper, ExternalLink, RefreshCw, Brain, TrendingUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { Progress } from "@/components/ui/progress";
 
 interface NewsArticle {
   title: string;
@@ -23,9 +24,17 @@ interface NewsArticlesProps {
   symbol: string;
 }
 
+interface NewsAnalysis {
+  summary: string;
+  impactScore: number;
+  insights: string[];
+}
+
 export const NewsArticles = ({ symbol }: NewsArticlesProps) => {
   const [articles, setArticles] = useState<NewsArticle[]>([]);
+  const [analysis, setAnalysis] = useState<NewsAnalysis | null>(null);
   const [loading, setLoading] = useState(false);
+  const [analyzing, setAnalyzing] = useState(false);
   const { toast } = useToast();
 
   const fetchNews = async () => {
@@ -49,7 +58,13 @@ export const NewsArticles = ({ symbol }: NewsArticlesProps) => {
         throw new Error(data.error);
       }
 
-      setArticles(data.articles || []);
+      const fetchedArticles = data.articles || [];
+      setArticles(fetchedArticles);
+      
+      // Analyze articles with AI
+      if (fetchedArticles.length > 0) {
+        analyzeNews(fetchedArticles);
+      }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to fetch news';
       toast({
@@ -59,6 +74,28 @@ export const NewsArticles = ({ symbol }: NewsArticlesProps) => {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const analyzeNews = async (articlesToAnalyze: NewsArticle[]) => {
+    setAnalyzing(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('analyze-market-news', {
+        body: { articles: articlesToAnalyze.slice(0, 5) },
+      });
+
+      if (error) throw error;
+
+      if (data.error) {
+        throw new Error(data.error);
+      }
+
+      setAnalysis(data);
+    } catch (err) {
+      console.error('Failed to analyze news:', err);
+      // Don't show error toast for analysis failures, just log it
+    } finally {
+      setAnalyzing(false);
     }
   };
 
@@ -89,6 +126,12 @@ export const NewsArticles = ({ symbol }: NewsArticlesProps) => {
     });
   };
 
+  const getImpactColor = (score: number) => {
+    if (score >= 70) return 'text-bearish';
+    if (score >= 40) return 'text-muted-foreground';
+    return 'text-bullish';
+  };
+
   return (
     <Card className="p-6 bg-card border-border">
       <div className="flex items-center justify-between mb-4">
@@ -105,6 +148,47 @@ export const NewsArticles = ({ symbol }: NewsArticlesProps) => {
           <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
         </Button>
       </div>
+
+      {analysis && (
+        <div className="mb-6 space-y-4">
+          <div className="bg-muted/50 rounded-lg p-4 space-y-3">
+            <div className="flex items-center gap-2">
+              <Brain className="h-4 w-4 text-primary" />
+              <h4 className="font-semibold text-sm">AI Analysis</h4>
+              {analyzing && <Badge variant="outline" className="text-xs">Analyzing...</Badge>}
+            </div>
+            
+            <p className="text-sm text-muted-foreground">{analysis.summary}</p>
+            
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <TrendingUp className="h-4 w-4" />
+                  <span className="text-sm font-medium">Market Impact Score</span>
+                </div>
+                <span className={`text-sm font-bold ${getImpactColor(analysis.impactScore)}`}>
+                  {analysis.impactScore}/100
+                </span>
+              </div>
+              <Progress value={analysis.impactScore} className="h-2" />
+            </div>
+
+            {analysis.insights && analysis.insights.length > 0 && (
+              <div className="space-y-1">
+                <p className="text-xs font-medium text-muted-foreground">Key Insights:</p>
+                <ul className="text-xs text-muted-foreground space-y-1">
+                  {analysis.insights.map((insight, idx) => (
+                    <li key={idx} className="flex items-start gap-2">
+                      <span className="text-primary mt-0.5">•</span>
+                      <span>{insight}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {articles.length === 0 && !loading && (
         <p className="text-sm text-muted-foreground text-center py-8">
