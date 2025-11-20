@@ -34,7 +34,8 @@ const Index = () => {
   const { toast } = useToast();
   const [autotradeEnabled, setAutotradeEnabled] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
-  const { error: marketDataError } = useMarketData("AAPL");
+  const [selectedSymbol, setSelectedSymbol] = useState("AAPL");
+  const { error: marketDataError } = useMarketData(selectedSymbol);
 
   const [watchlistItems, setWatchlistItems] = useState<Array<{ symbol: string; price: number; change: number }>>([]);
 
@@ -43,6 +44,17 @@ const Index = () => {
       fetchProfile();
       fetchWatchlist();
     }
+  }, [user]);
+
+  // Auto-refresh watchlist every 45 seconds
+  useEffect(() => {
+    if (!user) return;
+    
+    const interval = setInterval(() => {
+      fetchWatchlist();
+    }, 45000); // 45 seconds
+
+    return () => clearInterval(interval);
   }, [user]);
 
   const fetchWatchlist = async () => {
@@ -149,7 +161,11 @@ const Index = () => {
   };
 
   const handleSelectSymbol = (symbol: string) => {
-    console.log("Selected symbol:", symbol);
+    setSelectedSymbol(symbol);
+    toast({
+      title: "Symbol Selected",
+      description: `Now viewing ${symbol}`,
+    });
   };
 
   return (
@@ -219,7 +235,7 @@ const Index = () => {
 
           <TabsContent value="overview" className="space-y-6">
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <MarketData symbol="AAPL" />
+              <MarketData symbol={selectedSymbol} />
               <TradingSignal
                 signal="BUY"
                 confidence={87}
@@ -276,11 +292,11 @@ const Index = () => {
           </TabsContent>
 
           <TabsContent value="charts">
-            <AdvancedChart />
+            <AdvancedChart symbol={selectedSymbol} />
           </TabsContent>
 
           <TabsContent value="news">
-            <NewsArticles symbol="AAPL" />
+            <NewsArticles symbol={selectedSymbol} />
           </TabsContent>
 
           {isAdmin && (

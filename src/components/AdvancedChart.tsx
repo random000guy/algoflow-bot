@@ -101,7 +101,11 @@ const generateMockData = (): ChartData[] => {
   return data;
 };
 
-export const AdvancedChart = () => {
+interface AdvancedChartProps {
+  symbol?: string;
+}
+
+export const AdvancedChart = ({ symbol = "AAPL" }: AdvancedChartProps) => {
   const [data] = useState<ChartData[]>(generateMockData());
   const [activeIndicator, setActiveIndicator] = useState<"rsi" | "macd" | "bollinger">("rsi");
 
@@ -111,7 +115,7 @@ export const AdvancedChart = () => {
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-2">
             <TrendingUp className="h-5 w-5 text-primary" />
-            <h3 className="text-lg font-semibold">Advanced Chart with Indicators</h3>
+            <h3 className="text-lg font-semibold">Advanced Chart - {symbol}</h3>
           </div>
           <div className="flex gap-2">
             <Button
