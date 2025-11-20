@@ -36,18 +36,50 @@ const Index = () => {
   const [isAdmin, setIsAdmin] = useState(false);
   const { error: marketDataError } = useMarketData("AAPL");
 
-  const [watchlistItems, setWatchlistItems] = useState([
-    { symbol: "AAPL", price: 187.35, change: 2.45 },
-    { symbol: "MSFT", price: 378.91, change: -0.82 },
-    { symbol: "GOOGL", price: 141.23, change: 1.15 },
-    { symbol: "TSLA", price: 242.68, change: 5.32 },
-  ]);
+  const [watchlistItems, setWatchlistItems] = useState<Array<{ symbol: string; price: number; change: number }>>([]);
 
   useEffect(() => {
     if (user) {
       fetchProfile();
+      fetchWatchlist();
     }
   }, [user]);
+
+  const fetchWatchlist = async () => {
+    const { data: watchlistData } = await supabase
+      .from("watchlist")
+      .select("symbol")
+      .eq("user_id", user?.id);
+
+    if (watchlistData) {
+      // Fetch market data for each symbol
+      const itemsWithPrices = await Promise.all(
+        watchlistData.map(async (item) => {
+          try {
+            const { data } = await supabase.functions.invoke("fetch-market-data", {
+              body: { symbol: item.symbol },
+            });
+            
+            return {
+              symbol: item.symbol,
+              price: data?.price || 0,
+              change: data?.change || 0,
+            };
+          } catch {
+            // Return symbol with demo data if fetch fails
+            return {
+              symbol: item.symbol,
+              price: 0,
+              change: 0,
+            };
+          }
+        })
+      );
+      
+      setWatchlistItems(itemsWithPrices);
+    }
+  };
+
 
   const fetchProfile = async () => {
     const { data } = await supabase
@@ -83,8 +115,37 @@ const Index = () => {
     }
   };
 
-  const handleRemoveFromWatchlist = (symbol: string) => {
-    setWatchlistItems(items => items.filter(item => item.symbol !== symbol));
+  const handleAddToWatchlist = async (symbol: string) => {
+    const { error } = await supabase
+      .from("watchlist")
+      .insert({ user_id: user?.id, symbol });
+
+    if (error) {
+      if (error.code === "23505") {
+        throw new Error("Symbol already in watchlist");
+      }
+      throw new Error(error.message);
+    }
+
+    await fetchWatchlist();
+  };
+
+  const handleRemoveFromWatchlist = async (symbol: string) => {
+    const { error } = await supabase
+      .from("watchlist")
+      .delete()
+      .eq("user_id", user?.id)
+      .eq("symbol", symbol);
+
+    if (error) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    } else {
+      await fetchWatchlist();
+    }
   };
 
   const handleSelectSymbol = (symbol: string) => {
@@ -185,6 +246,7 @@ const Index = () => {
                 items={watchlistItems}
                 onRemove={handleRemoveFromWatchlist}
                 onSelect={handleSelectSymbol}
+                onAdd={handleAddToWatchlist}
               />
             </div>
           </TabsContent>
