@@ -94,19 +94,32 @@ Deno.serve(async (req) => {
         const fhResponse = await fetch(fhUrl);
         const fhData = await fhResponse.json();
         
-        if (fhData.c) {
+        console.log('Finnhub response for', symbol, ':', JSON.stringify(fhData));
+        
+        // Check for error response
+        if (fhData.error) {
+          return new Response(
+            JSON.stringify({ error: `Finnhub API error: ${fhData.error}` }),
+            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+        
+        // Check if we have valid price data
+        if (fhData.c !== undefined && fhData.c !== null && fhData.c !== 0) {
           marketData = {
             symbol: symbol,
             price: fhData.c,
-            change: fhData.d,
-            changePercent: fhData.dp,
+            change: fhData.d || 0,
+            changePercent: fhData.dp || 0,
             volume: fhData.v?.toString() || 'N/A',
             timestamp: new Date(fhData.t * 1000).toISOString(),
           };
         } else {
           return new Response(
-            JSON.stringify({ error: 'Invalid response from Finnhub' }),
-            { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            JSON.stringify({ 
+              error: `No data available for ${symbol}. The symbol may be invalid or market is closed.` 
+            }),
+            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
           );
         }
         break;
