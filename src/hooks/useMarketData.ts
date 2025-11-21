@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { marketDataCache } from "@/lib/marketDataCache";
 
 interface MarketDataResponse {
   symbol: string;
@@ -15,13 +16,26 @@ export const useMarketData = (symbol: string, refreshInterval = 60000) => {
   const [data, setData] = useState<MarketDataResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isCached, setIsCached] = useState(false);
   const { toast } = useToast();
 
-  const fetchData = async () => {
+  const fetchData = async (skipCache = false) => {
     if (!symbol) return;
+    
+    // Check cache first unless explicitly skipping
+    if (!skipCache) {
+      const cachedData = marketDataCache.get<MarketDataResponse>(symbol);
+      if (cachedData) {
+        setData(cachedData);
+        setIsCached(true);
+        setError(null);
+        return;
+      }
+    }
     
     setLoading(true);
     setError(null);
+    setIsCached(false);
 
     try {
       // Ensure user is authenticated before calling the edge function
@@ -49,18 +63,13 @@ export const useMarketData = (symbol: string, refreshInterval = 60000) => {
       }
 
       setData(functionData);
+      // Cache the successful response
+      marketDataCache.set(symbol, functionData);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to fetch market data';
       setError(errorMessage);
       
-      // Only show toast for configuration errors
-      if (errorMessage.includes('configured') || errorMessage.includes('API key')) {
-        toast({
-          title: "Market Data Unavailable",
-          description: errorMessage,
-          variant: "destructive",
-        });
-      }
+      // Don't show toast, let the component handle error display
     } finally {
       setLoading(false);
     }
@@ -70,10 +79,16 @@ export const useMarketData = (symbol: string, refreshInterval = 60000) => {
     fetchData();
     
     // Set up refresh interval
-    const interval = setInterval(fetchData, refreshInterval);
+    const interval = setInterval(() => fetchData(true), refreshInterval);
     
     return () => clearInterval(interval);
   }, [symbol, refreshInterval]);
 
-  return { data, loading, error, refetch: fetchData };
+  return { 
+    data, 
+    loading, 
+    error, 
+    refetch: () => fetchData(true),
+    isCached 
+  };
 };
