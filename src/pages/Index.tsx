@@ -14,6 +14,7 @@ import { StrategyBuilder } from "@/components/StrategyBuilder";
 import { PaperTrading } from "@/components/PaperTrading";
 import { AdvancedChart } from "@/components/AdvancedChart";
 import { NewsArticles } from "@/components/NewsArticles";
+import { StockComparison } from "@/components/StockComparison";
 import { Activity, Settings as SettingsIcon, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -223,6 +224,7 @@ const Index = () => {
           <TabsList className="w-full flex flex-wrap justify-start gap-1">
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="portfolio">Portfolio</TabsTrigger>
+            <TabsTrigger value="comparison">Compare</TabsTrigger>
             <TabsTrigger value="history">History</TabsTrigger>
             <TabsTrigger value="backtest">Backtest</TabsTrigger>
             <TabsTrigger value="alerts">Alerts</TabsTrigger>
@@ -269,6 +271,10 @@ const Index = () => {
 
           <TabsContent value="portfolio">
             <Portfolio />
+          </TabsContent>
+
+          <TabsContent value="comparison">
+            <StockComparison />
           </TabsContent>
 
           <TabsContent value="history">
