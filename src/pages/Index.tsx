@@ -15,6 +15,7 @@ import { PaperTrading } from "@/components/PaperTrading";
 import { AdvancedChart } from "@/components/AdvancedChart";
 import { NewsArticles } from "@/components/NewsArticles";
 import { StockComparison } from "@/components/StockComparison";
+import { MarketDataStatus } from "@/components/MarketDataStatus";
 import { Activity, Settings as SettingsIcon, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -202,22 +203,8 @@ const Index = () => {
           </div>
         </div>
 
-        {/* Market Data Info Banner */}
-        {marketDataError && (
-          <Alert className="border-primary/20 bg-primary/5">
-            <Info className="h-4 w-4 text-primary" />
-            <AlertDescription className="text-sm">
-              <strong>Demo data is being displayed.</strong> To view live market data, configure a market data provider in{" "}
-              <button 
-                onClick={() => navigate("/settings")}
-                className="font-semibold underline hover:text-primary transition-colors"
-              >
-                Settings
-              </button>
-              .
-            </AlertDescription>
-          </Alert>
-        )}
+        {/* Market Data Status */}
+        <MarketDataStatus />
 
         {/* Main Content */}
         <Tabs defaultValue="overview" className="space-y-6">

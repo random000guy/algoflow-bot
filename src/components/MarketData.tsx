@@ -1,15 +1,21 @@
 import { Card } from "@/components/ui/card";
-import { TrendingUp, TrendingDown, Activity, RefreshCw } from "lucide-react";
+import { TrendingUp, TrendingDown, Activity, RefreshCw, Clock } from "lucide-react";
 import { useMarketData } from "@/hooks/useMarketData";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { MarketDataError } from "./MarketDataError";
 
 interface MarketDataProps {
   symbol: string;
 }
 
 export const MarketData = ({ symbol }: MarketDataProps) => {
-  const { data, loading, error, refetch } = useMarketData(symbol);
+  const { data, loading, error, refetch, isCached } = useMarketData(symbol);
+  
+  // Show error component if there's an error
+  if (error && !data) {
+    return <MarketDataError error={error} onRetry={refetch} isRetrying={loading} />;
+  }
   
   // Fallback to mock data if real data unavailable
   const price = data?.price ?? 187.35;
@@ -32,6 +38,12 @@ export const MarketData = ({ symbol }: MarketDataProps) => {
             >
               {error ? "Demo" : "Live"}
             </Badge>
+            {isCached && (
+              <Badge variant="outline" className="text-xs flex items-center gap-1">
+                <Clock className="h-3 w-3" />
+                Cached
+              </Badge>
+            )}
           </div>
           <p className="text-xl font-bold font-mono">{symbol}</p>
         </div>
