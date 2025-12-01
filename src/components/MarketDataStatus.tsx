@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Database, Wifi, WifiOff, Settings } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Info } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -10,6 +11,7 @@ export const MarketDataStatus = () => {
   const [provider, setProvider] = useState<string | null>(null);
   const [isConnected, setIsConnected] = useState<boolean | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -36,13 +38,16 @@ export const MarketDataStatus = () => {
       if (config && config.api_key_encrypted) {
         setProvider(config.provider === 'alpha_vantage' ? 'Alpha Vantage' : 'Finnhub');
         setIsConnected(true);
+        setError(false);
       } else {
         setProvider(null);
         setIsConnected(false);
+        setError(true);
       }
     } catch (error) {
       console.error('Error checking provider status:', error);
       setIsConnected(false);
+      setError(true);
     } finally {
       setLoading(false);
     }
@@ -53,43 +58,62 @@ export const MarketDataStatus = () => {
   }
 
   return (
-    <Card className="p-3 bg-card/50 border-border">
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <Database className="h-4 w-4 text-muted-foreground" />
-          <span className="text-sm text-muted-foreground">Market Data:</span>
-        </div>
-        
-        <div className="flex items-center gap-2">
-          {isConnected ? (
-            <>
-              <Badge variant="default" className="flex items-center gap-1">
-                <Wifi className="h-3 w-3" />
-                <span>{provider}</span>
-              </Badge>
-              <Badge variant="outline" className="bg-bullish/10 text-bullish border-bullish/30">
-                Connected
-              </Badge>
-            </>
-          ) : (
-            <>
-              <Badge variant="secondary" className="flex items-center gap-1">
-                <WifiOff className="h-3 w-3" />
-                <span>No Provider</span>
-              </Badge>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => navigate('/settings')}
-                className="h-7 text-xs"
-              >
-                <Settings className="h-3 w-3 mr-1" />
-                Configure
-              </Button>
-            </>
-          )}
-        </div>
-      </div>
-    </Card>
+    <>
+      {error && !provider && (
+        <Alert variant="default" className="bg-gradient-to-r from-muted/50 to-muted/30 border-border/50 backdrop-blur-sm">
+          <Info className="h-4 w-4 text-primary" />
+          <AlertDescription className="flex items-center justify-between">
+            <span className="text-sm">No market data provider configured. Using demo data.</span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => navigate("/settings")}
+              className="ml-4 hover:bg-primary hover:text-primary-foreground transition-colors"
+            >
+              Configure Provider
+            </Button>
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {provider && (
+        <Card className="p-4 bg-gradient-to-r from-card/80 to-card/60 border-border/50 backdrop-blur-sm shadow-lg">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="relative">
+                <div className={`h-3 w-3 rounded-full ${isConnected ? 'bg-bullish' : 'bg-bearish'}`} />
+                {isConnected && (
+                  <div className="absolute inset-0 h-3 w-3 rounded-full bg-bullish animate-ping opacity-75" />
+                )}
+              </div>
+              <div>
+                <p className="text-sm font-semibold">
+                  Market Data: {provider}
+                </p>
+                <p className="text-xs text-muted-foreground flex items-center gap-1">
+                  {isConnected ? (
+                    <>
+                      <span className="text-bullish">●</span> Connected & Active
+                    </>
+                  ) : (
+                    <>
+                      <span className="text-bearish">●</span> Disconnected
+                    </>
+                  )}
+                </p>
+              </div>
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => navigate("/settings")}
+              className="hover:bg-primary/10 hover:text-primary transition-colors"
+            >
+              Settings
+            </Button>
+          </div>
+        </Card>
+      )}
+    </>
   );
 };

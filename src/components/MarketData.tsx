@@ -27,14 +27,14 @@ export const MarketData = ({ symbol }: MarketDataProps) => {
   const TrendIcon = isPositive ? TrendingUp : TrendingDown;
 
   return (
-    <Card className="p-4 bg-card border-border hover:border-primary/50 transition-all duration-300">
+    <Card className="p-5 bg-gradient-to-br from-card to-card/50 border-border hover:border-primary/50 transition-all duration-300 hover:shadow-xl group">
       <div className="flex items-start justify-between">
-        <div className="space-y-1">
+        <div className="space-y-2">
           <div className="flex items-center gap-2">
-            <p className="text-sm text-muted-foreground">Symbol</p>
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Symbol</p>
             <Badge 
               variant={error ? "secondary" : "default"}
-              className="text-xs"
+              className={`text-xs ${!error && 'bg-bullish/20 text-bullish border-bullish/30'}`}
             >
               {error ? "Demo" : "Live"}
             </Badge>
@@ -45,7 +45,7 @@ export const MarketData = ({ symbol }: MarketDataProps) => {
               </Badge>
             )}
           </div>
-          <p className="text-xl font-bold font-mono">{symbol}</p>
+          <p className="text-2xl font-bold font-mono tracking-tight">{symbol}</p>
         </div>
         <div className="flex items-center gap-2">
           <Button
@@ -53,24 +53,29 @@ export const MarketData = ({ symbol }: MarketDataProps) => {
             size="sm"
             onClick={() => refetch()}
             disabled={loading}
+            className="hover:bg-primary/10 hover:text-primary transition-colors"
           >
             <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
           </Button>
-          <TrendIcon className={`h-5 w-5 ${trendColor}`} />
+          <div className={`p-2 rounded-lg ${isPositive ? 'bg-bullish/10' : 'bg-bearish/10'}`}>
+            <TrendIcon className={`h-5 w-5 ${trendColor}`} />
+          </div>
         </div>
       </div>
       
-      <div className="mt-4 space-y-2">
-        <div className="flex items-baseline gap-2">
-          <span className="text-3xl font-bold font-mono">${price.toFixed(2)}</span>
-          <span className={`text-sm font-semibold ${trendColor} flex items-center gap-1`}>
+      <div className="mt-6 space-y-3">
+        <div className="flex items-baseline gap-3">
+          <span className="text-4xl font-bold font-mono tracking-tight">${price.toFixed(2)}</span>
+          <span className={`text-lg font-semibold ${trendColor} flex items-center gap-1 px-2 py-1 rounded-lg ${
+            isPositive ? 'bg-bullish/10' : 'bg-bearish/10'
+          }`}>
             {isPositive ? "+" : ""}{change.toFixed(2)}%
           </span>
         </div>
         
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+        <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/30 rounded-lg px-3 py-2">
           <Activity className="h-4 w-4" />
-          <span>Vol: {volume}</span>
+          <span className="font-medium">Volume: <span className="font-mono">{volume}</span></span>
         </div>
       </div>
     </Card>

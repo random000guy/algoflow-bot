@@ -71,18 +71,33 @@ const Auth = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-6">
-      <div className="w-full max-w-md">
-        <div className="flex items-center justify-center gap-3 mb-8">
-          <Activity className="h-10 w-10 text-primary" />
-          <h1 className="text-3xl font-bold">Trading Bot</h1>
+    <div className="min-h-screen bg-background flex items-center justify-center p-6 relative overflow-hidden">
+      {/* Background gradient effect */}
+      <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-accent/5 pointer-events-none" />
+      
+      <div className="w-full max-w-md relative z-10">
+        <div className="flex flex-col items-center justify-center gap-4 mb-8">
+          <div className="relative">
+            <Activity className="h-12 w-12 text-primary animate-pulse-slow" />
+            <div className="absolute inset-0 bg-primary/20 blur-xl rounded-full" />
+          </div>
+          <div className="text-center">
+            <h1 className="text-4xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+              Trading Bot
+            </h1>
+            <p className="text-muted-foreground mt-2">Professional trading dashboard</p>
+          </div>
         </div>
 
-        <Card className="p-6 bg-card border-border">
+        <Card className="p-6 bg-card/80 backdrop-blur-sm border-border shadow-2xl">
           <Tabs defaultValue="signin" className="w-full">
-            <TabsList className="grid w-full grid-cols-2 mb-6">
-              <TabsTrigger value="signin">Sign In</TabsTrigger>
-              <TabsTrigger value="signup">Sign Up</TabsTrigger>
+            <TabsList className="grid w-full grid-cols-2 mb-6 bg-muted/50">
+              <TabsTrigger value="signin" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                Sign In
+              </TabsTrigger>
+              <TabsTrigger value="signup" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                Sign Up
+              </TabsTrigger>
             </TabsList>
 
             <TabsContent value="signin">
@@ -111,7 +126,7 @@ const Auth = () => {
                   />
                 </div>
 
-                <Button type="submit" className="w-full" disabled={isLoading}>
+                <Button type="submit" className="w-full mt-6 h-11 shadow-lg hover:shadow-xl transition-all" disabled={isLoading}>
                   {isLoading ? "Signing in..." : "Sign In"}
                 </Button>
               </form>
@@ -156,13 +171,21 @@ const Auth = () => {
                   />
                 </div>
 
-                <Button type="submit" className="w-full" disabled={isLoading}>
+                <Button type="submit" className="w-full mt-6 h-11 shadow-lg hover:shadow-xl transition-all" disabled={isLoading}>
                   {isLoading ? "Creating account..." : "Sign Up"}
                 </Button>
               </form>
             </TabsContent>
           </Tabs>
+          
+          <div className="mt-6 text-center text-sm text-muted-foreground">
+            <p>By signing in, you agree to our Terms of Service</p>
+          </div>
         </Card>
+        
+        <div className="mt-6 text-center text-xs text-muted-foreground">
+          <p>© 2025 Trading Bot Dashboard. All rights reserved.</p>
+        </div>
       </div>
     </div>
   );
