@@ -16,6 +16,8 @@ import { AdvancedChart } from "@/components/AdvancedChart";
 import { NewsArticles } from "@/components/NewsArticles";
 import { StockComparison } from "@/components/StockComparison";
 import { MarketDataStatus } from "@/components/MarketDataStatus";
+import { HistoricalChart } from "@/components/HistoricalChart";
+import { usePriceAlertNotifications } from "@/hooks/usePriceAlertNotifications";
 import { Activity, Settings as SettingsIcon, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -38,6 +40,9 @@ const Index = () => {
   const [isAdmin, setIsAdmin] = useState(false);
   const [selectedSymbol, setSelectedSymbol] = useState("AAPL");
   const { error: marketDataError } = useMarketData(selectedSymbol);
+  
+  // Enable price alert notifications
+  usePriceAlertNotifications();
 
   const [watchlistItems, setWatchlistItems] = useState<Array<{ symbol: string; price: number; change: number }>>([]);
 
@@ -211,6 +216,7 @@ const Index = () => {
           <TabsList className="w-full flex flex-wrap justify-start gap-1">
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="portfolio">Portfolio</TabsTrigger>
+            <TabsTrigger value="charts">Intraday Chart</TabsTrigger>
             <TabsTrigger value="comparison">Compare</TabsTrigger>
             <TabsTrigger value="history">History</TabsTrigger>
             <TabsTrigger value="backtest">Backtest</TabsTrigger>
@@ -218,7 +224,7 @@ const Index = () => {
             <TabsTrigger value="news">News</TabsTrigger>
             <TabsTrigger value="strategy">Strategy Builder</TabsTrigger>
             <TabsTrigger value="paper">Paper Trading</TabsTrigger>
-            <TabsTrigger value="charts">Advanced Charts</TabsTrigger>
+            <TabsTrigger value="advanced">Advanced Charts</TabsTrigger>
             {isAdmin && <TabsTrigger value="admin">Admin</TabsTrigger>}
           </TabsList>
 
@@ -260,6 +266,10 @@ const Index = () => {
             <Portfolio />
           </TabsContent>
 
+          <TabsContent value="charts">
+            <HistoricalChart symbol={selectedSymbol} />
+          </TabsContent>
+
           <TabsContent value="comparison">
             <StockComparison />
           </TabsContent>
@@ -284,7 +294,7 @@ const Index = () => {
             <PaperTrading />
           </TabsContent>
 
-          <TabsContent value="charts">
+          <TabsContent value="advanced">
             <AdvancedChart symbol={selectedSymbol} />
           </TabsContent>
 
