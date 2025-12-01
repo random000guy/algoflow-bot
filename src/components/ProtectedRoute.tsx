@@ -11,6 +11,8 @@ export const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   useEffect(() => {
     if (user) {
       checkApprovalStatus();
+    } else {
+      setCheckingApproval(false);
     }
   }, [user]);
 
