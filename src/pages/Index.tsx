@@ -23,11 +23,12 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { Card } from "@/components/ui/card";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useMarketData } from "@/hooks/useMarketData";
 
 const Index = () => {
@@ -179,30 +180,44 @@ const Index = () => {
     <div className="min-h-screen bg-background p-6">
       <div className="max-w-7xl mx-auto space-y-6">
         {/* Header */}
-        <div className="flex items-center justify-between pb-4 border-b border-border">
-          <div className="flex items-center gap-3">
-            <Activity className="h-8 w-8 text-primary" />
+        <div className="flex items-center justify-between pb-6 mb-6 border-b border-border/50">
+          <div className="flex items-center gap-4">
+            <div className="relative">
+              <Activity className="h-10 w-10 text-primary animate-pulse-slow" />
+              <div className="absolute inset-0 bg-primary/20 blur-xl rounded-full" />
+            </div>
             <div>
-              <h1 className="text-3xl font-bold">Trading Dashboard</h1>
-              <p className="text-sm text-muted-foreground">{user?.email}</p>
+              <h1 className="text-4xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+                Trading Dashboard
+              </h1>
+              <p className="text-sm text-muted-foreground mt-1 flex items-center gap-2">
+                <span className="text-primary">●</span>
+                {user?.email}
+              </p>
             </div>
           </div>
           <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2 border-r border-border pr-3">
+            <Card className={`flex items-center gap-3 px-4 py-2 transition-all ${
+              autotradeEnabled ? 'bg-bullish/10 border-bullish/30' : 'bg-card/50 border-border'
+            }`}>
               <Switch
                 id="autotrade"
                 checked={autotradeEnabled}
                 onCheckedChange={toggleAutotrade}
               />
-              <Label htmlFor="autotrade" className="cursor-pointer">
-                Autotrade {autotradeEnabled ? 'ON' : 'OFF'}
+              <Label htmlFor="autotrade" className="cursor-pointer font-semibold text-sm whitespace-nowrap">
+                Autotrade {autotradeEnabled ? (
+                  <span className="text-bullish">ON</span>
+                ) : (
+                  <span className="text-muted-foreground">OFF</span>
+                )}
               </Label>
-            </div>
-            <Button variant="outline" onClick={() => navigate("/settings")}>
+            </Card>
+            <Button variant="outline" onClick={() => navigate("/settings")} className="hover:bg-primary/10 hover:text-primary transition-colors">
               <SettingsIcon className="h-4 w-4 mr-2" />
               Settings
             </Button>
-            <Button variant="outline" onClick={signOut}>
+            <Button variant="outline" onClick={signOut} className="hover:bg-destructive/10 hover:text-destructive transition-colors">
               Sign Out
             </Button>
           </div>
@@ -213,20 +228,48 @@ const Index = () => {
 
         {/* Main Content */}
         <Tabs defaultValue="overview" className="space-y-6">
-          <TabsList className="w-full flex flex-wrap justify-start gap-1">
-            <TabsTrigger value="overview">Overview</TabsTrigger>
-            <TabsTrigger value="portfolio">Portfolio</TabsTrigger>
-            <TabsTrigger value="charts">Intraday Chart</TabsTrigger>
-            <TabsTrigger value="comparison">Compare</TabsTrigger>
-            <TabsTrigger value="history">History</TabsTrigger>
-            <TabsTrigger value="backtest">Backtest</TabsTrigger>
-            <TabsTrigger value="alerts">Alerts</TabsTrigger>
-            <TabsTrigger value="news">News</TabsTrigger>
-            <TabsTrigger value="strategy">Strategy Builder</TabsTrigger>
-            <TabsTrigger value="paper">Paper Trading</TabsTrigger>
-            <TabsTrigger value="advanced">Advanced Charts</TabsTrigger>
-            {isAdmin && <TabsTrigger value="admin">Admin</TabsTrigger>}
-          </TabsList>
+          <div className="bg-card/30 backdrop-blur-sm rounded-lg p-1 border border-border/50">
+            <TabsList className="w-full flex flex-wrap justify-start gap-1 bg-transparent">
+              <TabsTrigger value="overview" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                Overview
+              </TabsTrigger>
+              <TabsTrigger value="portfolio" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                Portfolio
+              </TabsTrigger>
+              <TabsTrigger value="charts" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                Intraday Chart
+              </TabsTrigger>
+              <TabsTrigger value="comparison" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                Compare
+              </TabsTrigger>
+              <TabsTrigger value="history" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                History
+              </TabsTrigger>
+              <TabsTrigger value="backtest" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                Backtest
+              </TabsTrigger>
+              <TabsTrigger value="alerts" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                Alerts
+              </TabsTrigger>
+              <TabsTrigger value="news" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                News
+              </TabsTrigger>
+              <TabsTrigger value="strategy" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                Strategy Builder
+              </TabsTrigger>
+              <TabsTrigger value="paper" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                Paper Trading
+              </TabsTrigger>
+              <TabsTrigger value="advanced" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                Advanced Charts
+              </TabsTrigger>
+              {isAdmin && (
+                <TabsTrigger value="admin" className="data-[state=active]:bg-destructive data-[state=active]:text-destructive-foreground">
+                  Admin
+                </TabsTrigger>
+              )}
+            </TabsList>
+          </div>
 
           <TabsContent value="overview" className="space-y-6">
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
