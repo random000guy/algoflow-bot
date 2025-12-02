@@ -1,7 +1,6 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { MarketData } from "@/components/MarketData";
 import { SentimentAnalysis } from "@/components/SentimentAnalysis";
-import { TradingSignal } from "@/components/TradingSignal";
 import { RiskManager } from "@/components/RiskManager";
 import { OrderEntry } from "@/components/OrderEntry";
 import { Watchlist } from "@/components/Watchlist";
@@ -12,14 +11,14 @@ import { PriceAlerts } from "@/components/PriceAlerts";
 import { AdminApproval } from "@/components/AdminApproval";
 import { StrategyBuilder } from "@/components/StrategyBuilder";
 import { PaperTrading } from "@/components/PaperTrading";
-import { AdvancedChart } from "@/components/AdvancedChart";
 import { NewsArticles } from "@/components/NewsArticles";
 import { StockComparison } from "@/components/StockComparison";
 import { MarketDataStatus } from "@/components/MarketDataStatus";
-import { HistoricalChart } from "@/components/HistoricalChart";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { KeyboardShortcutsHelp } from "@/components/KeyboardShortcutsHelp";
 import { DraggableDashboard, DashboardItem } from "@/components/DraggableDashboard";
+import { EnhancedTradingSignal } from "@/components/EnhancedTradingSignal";
+import { EnhancedChart } from "@/components/EnhancedChart";
 import { 
   MarketDataSkeleton, 
   TradingSignalSkeleton, 
@@ -28,7 +27,7 @@ import {
 } from "@/components/DashboardSkeleton";
 import { usePriceAlertNotifications } from "@/hooks/usePriceAlertNotifications";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
-import { Activity, Settings as SettingsIcon } from "lucide-react";
+import { Activity, Settings as SettingsIcon, Bell, ShoppingCart } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
@@ -59,6 +58,8 @@ const Index = () => {
   usePriceAlertNotifications();
 
   const [watchlistItems, setWatchlistItems] = useState<Array<{ symbol: string; price: number; change: number }>>([]);
+  const [showQuickOrder, setShowQuickOrder] = useState(false);
+  const [quickOrderSide, setQuickOrderSide] = useState<"buy" | "sell">("buy");
 
   // Keyboard shortcuts
   const shortcuts = useMemo(() => [
@@ -80,12 +81,72 @@ const Index = () => {
       action: () => navigate("/settings"),
       description: "Go to settings",
     },
+    {
+      key: "b",
+      action: () => {
+        setQuickOrderSide("buy");
+        toast({ 
+          title: "Quick Buy Mode",
+          description: `Ready to buy ${selectedSymbol}`,
+          duration: 2000
+        });
+      },
+      description: "Quick buy order",
+    },
+    {
+      key: "n",
+      action: () => {
+        setQuickOrderSide("sell");
+        toast({ 
+          title: "Quick Sell Mode",
+          description: `Ready to sell ${selectedSymbol}`,
+          duration: 2000
+        });
+      },
+      description: "Quick sell order",
+    },
+    {
+      key: "a",
+      action: () => {
+        setActiveTab("alerts");
+        toast({ title: "Add Alert", description: "Navigate to alerts tab", duration: 1500 });
+      },
+      description: "Add price alert",
+    },
+    {
+      key: "w",
+      action: async () => {
+        try {
+          await handleAddToWatchlist(selectedSymbol);
+          toast({ title: "Added to Watchlist", description: selectedSymbol, duration: 1500 });
+        } catch (e: any) {
+          toast({ title: "Error", description: e.message, variant: "destructive" });
+        }
+      },
+      description: "Add to watchlist",
+    },
+    {
+      key: "c",
+      action: () => {
+        setActiveTab("charts");
+        toast({ title: "Charts", description: "Viewing enhanced chart", duration: 1500 });
+      },
+      description: "Toggle chart type",
+    },
+    {
+      key: "i",
+      action: () => {
+        setActiveTab("advanced");
+        toast({ title: "Indicators", description: "View technical indicators", duration: 1500 });
+      },
+      description: "Cycle indicators",
+    },
     ...TABS.map((tab, index) => ({
       key: String(index + 1),
       action: () => setActiveTab(tab),
       description: `Switch to ${tab} tab`,
     })),
-  ], [autotradeEnabled, navigate, refetchMarketData, toast]);
+  ], [autotradeEnabled, navigate, refetchMarketData, toast, selectedSymbol]);
 
   useKeyboardShortcuts(shortcuts);
 
@@ -231,13 +292,7 @@ const Index = () => {
     { 
       id: "trading-signal", 
       component: isLoading ? <TradingSignalSkeleton /> : (
-        <TradingSignal
-          signal="BUY"
-          confidence={87}
-          reason="Strong bullish sentiment combined with positive price momentum"
-          targetPrice={195.50}
-          stopLoss={182.30}
-        />
+        <EnhancedTradingSignal symbol={selectedSymbol} />
       ),
       colSpan: 1
     },
@@ -387,7 +442,7 @@ const Index = () => {
           </TabsContent>
 
           <TabsContent value="charts" className="animate-fade-in">
-            <HistoricalChart symbol={selectedSymbol} />
+            <EnhancedChart symbol={selectedSymbol} />
           </TabsContent>
 
           <TabsContent value="comparison" className="animate-fade-in">
@@ -415,7 +470,7 @@ const Index = () => {
           </TabsContent>
 
           <TabsContent value="advanced" className="animate-fade-in">
-            <AdvancedChart symbol={selectedSymbol} />
+            <EnhancedChart symbol={selectedSymbol} />
           </TabsContent>
 
           <TabsContent value="news" className="animate-fade-in">
