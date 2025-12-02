@@ -12,12 +12,16 @@ interface MarketDataProps {
 export const MarketData = ({ symbol }: MarketDataProps) => {
   const { data, loading, error, refetch, isCached } = useMarketData(symbol);
   
-  // Show error component if there's an error
-  if (error && !data) {
+  // Check if error is a config error (expected when no provider configured)
+  const isConfigError = error?.includes('configured') || error?.includes('API key') || error?.includes('provider');
+  
+  // Only show error component for unexpected errors, not config errors
+  if (error && !data && !isConfigError) {
     return <MarketDataError error={error} onRetry={refetch} isRetrying={loading} />;
   }
   
-  // Fallback to mock data if real data unavailable
+  // Use demo data when no provider configured or data unavailable
+  const isDemo = !data || isConfigError;
   const price = data?.price ?? 187.35;
   const change = data?.changePercent ?? 2.45;
   const volume = data?.volume ?? "52.3M";
@@ -33,10 +37,10 @@ export const MarketData = ({ symbol }: MarketDataProps) => {
           <div className="flex items-center gap-2">
             <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Symbol</p>
             <Badge 
-              variant={error ? "secondary" : "default"}
-              className={`text-xs ${!error && 'bg-bullish/20 text-bullish border-bullish/30'}`}
+              variant={isDemo ? "secondary" : "default"}
+              className={`text-xs ${!isDemo && 'bg-bullish/20 text-bullish border-bullish/30'}`}
             >
-              {error ? "Demo" : "Live"}
+              {isDemo ? "Demo" : "Live"}
             </Badge>
             {isCached && (
               <Badge variant="outline" className="text-xs flex items-center gap-1">
