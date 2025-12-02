@@ -8,6 +8,56 @@ All colors MUST be HSL.
 
 @layer base {
   :root {
+    --background: 0 0% 100%;
+    --foreground: 222 47% 11%;
+
+    --card: 0 0% 98%;
+    --card-foreground: 222 47% 11%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 11%;
+
+    --primary: 217 91% 50%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 217 20% 94%;
+    --secondary-foreground: 222 47% 11%;
+
+    --muted: 217 20% 96%;
+    --muted-foreground: 215 20% 45%;
+
+    --accent: 217 91% 50%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 217 20% 88%;
+    --input: 217 20% 88%;
+    --ring: 217 91% 50%;
+
+    --radius: 0.5rem;
+
+    --bullish: 142 76% 36%;
+    --bullish-foreground: 0 0% 100%;
+    --bullish-glow: 142 76% 36%;
+
+    --bearish: 0 84% 60%;
+    --bearish-foreground: 0 0% 100%;
+    --bearish-glow: 0 84% 60%;
+
+    --neutral: 43 96% 46%;
+    --neutral-foreground: 222 47% 11%;
+    --neutral-glow: 43 96% 46%;
+
+    --data-bg: 217 20% 96%;
+    --data-border: 217 20% 88%;
+
+    --chart-line: 217 91% 50%;
+    --chart-area: 217 91% 50%;
+  }
+
+  .dark {
     --background: 222 47% 11%;
     --foreground: 210 40% 98%;
 
@@ -36,8 +86,6 @@ All colors MUST be HSL.
     --input: 215 28% 17%;
     --ring: 217 91% 60%;
 
-    --radius: 0.5rem;
-
     --bullish: 142 76% 36%;
     --bullish-foreground: 210 40% 98%;
     --bullish-glow: 142 76% 36%;
@@ -60,7 +108,7 @@ All colors MUST be HSL.
 
 @layer base {
   * {
-    @apply border-border;
+    @apply border-border transition-colors duration-200;
   }
 
   body {
@@ -108,14 +156,9 @@ All colors MUST be HSL.
   .data-card {
     @apply bg-data-bg border border-data-border rounded-lg p-4;
   }
-}
 
-@layer base {
-  * {
-    @apply border-border;
-  }
-
-  body {
-    @apply bg-background text-foreground;
+  /* Theme transition animation */
+  .theme-transition {
+    transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
   }
 }

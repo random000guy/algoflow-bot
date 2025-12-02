@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { MarketData } from "@/components/MarketData";
 import { SentimentAnalysis } from "@/components/SentimentAnalysis";
 import { TradingSignal } from "@/components/TradingSignal";
@@ -17,35 +17,77 @@ import { NewsArticles } from "@/components/NewsArticles";
 import { StockComparison } from "@/components/StockComparison";
 import { MarketDataStatus } from "@/components/MarketDataStatus";
 import { HistoricalChart } from "@/components/HistoricalChart";
+import { ThemeToggle } from "@/components/ThemeToggle";
+import { KeyboardShortcutsHelp } from "@/components/KeyboardShortcutsHelp";
+import { DraggableDashboard, DashboardItem } from "@/components/DraggableDashboard";
+import { 
+  MarketDataSkeleton, 
+  TradingSignalSkeleton, 
+  SentimentSkeleton,
+  WatchlistSkeleton 
+} from "@/components/DashboardSkeleton";
 import { usePriceAlertNotifications } from "@/hooks/usePriceAlertNotifications";
-import { Activity, Settings as SettingsIcon, Info } from "lucide-react";
+import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
+import { Activity, Settings as SettingsIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useMarketData } from "@/hooks/useMarketData";
 
+const TABS = ["overview", "portfolio", "charts", "comparison", "history", "backtest", "alerts", "news", "strategy", "paper", "advanced"];
+
 const Index = () => {
   const [accountSize, setAccountSize] = useState(10000);
   const [riskPerTrade, setRiskPerTrade] = useState(2);
+  const [activeTab, setActiveTab] = useState("overview");
+  const [isLoading, setIsLoading] = useState(true);
   const navigate = useNavigate();
   const { user, signOut } = useAuth();
   const { toast } = useToast();
   const [autotradeEnabled, setAutotradeEnabled] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [selectedSymbol, setSelectedSymbol] = useState("AAPL");
-  const { error: marketDataError } = useMarketData(selectedSymbol);
+  const { refetch: refetchMarketData } = useMarketData(selectedSymbol);
   
   // Enable price alert notifications
   usePriceAlertNotifications();
 
   const [watchlistItems, setWatchlistItems] = useState<Array<{ symbol: string; price: number; change: number }>>([]);
+
+  // Keyboard shortcuts
+  const shortcuts = useMemo(() => [
+    {
+      key: "r",
+      action: () => {
+        refetchMarketData();
+        toast({ title: "Refreshing data...", duration: 1500 });
+      },
+      description: "Refresh market data",
+    },
+    {
+      key: "t",
+      action: () => toggleAutotrade(!autotradeEnabled),
+      description: "Toggle autotrade",
+    },
+    {
+      key: "s",
+      action: () => navigate("/settings"),
+      description: "Go to settings",
+    },
+    ...TABS.map((tab, index) => ({
+      key: String(index + 1),
+      action: () => setActiveTab(tab),
+      description: `Switch to ${tab} tab`,
+    })),
+  ], [autotradeEnabled, navigate, refetchMarketData, toast]);
+
+  useKeyboardShortcuts(shortcuts);
 
   useEffect(() => {
     if (user) {
@@ -54,13 +96,19 @@ const Index = () => {
     }
   }, [user]);
 
+  // Simulate loading state
+  useEffect(() => {
+    const timer = setTimeout(() => setIsLoading(false), 1000);
+    return () => clearTimeout(timer);
+  }, []);
+
   // Auto-refresh watchlist every 45 seconds
   useEffect(() => {
     if (!user) return;
     
     const interval = setInterval(() => {
       fetchWatchlist();
-    }, 45000); // 45 seconds
+    }, 45000);
 
     return () => clearInterval(interval);
   }, [user]);
@@ -72,7 +120,6 @@ const Index = () => {
       .eq("user_id", user?.id);
 
     if (watchlistData) {
-      // Fetch market data for each symbol
       const itemsWithPrices = await Promise.all(
         watchlistData.map(async (item) => {
           try {
@@ -86,7 +133,6 @@ const Index = () => {
               change: data?.change || 0,
             };
           } catch {
-            // Return symbol with demo data if fetch fails
             return {
               symbol: item.symbol,
               price: 0,
@@ -99,7 +145,6 @@ const Index = () => {
       setWatchlistItems(itemsWithPrices);
     }
   };
-
 
   const fetchProfile = async () => {
     const { data } = await supabase
@@ -176,8 +221,47 @@ const Index = () => {
     });
   };
 
+  // Draggable dashboard items for overview
+  const overviewItems: DashboardItem[] = useMemo(() => [
+    { 
+      id: "market-data", 
+      component: isLoading ? <MarketDataSkeleton /> : <MarketData symbol={selectedSymbol} />,
+      colSpan: 1
+    },
+    { 
+      id: "trading-signal", 
+      component: isLoading ? <TradingSignalSkeleton /> : (
+        <TradingSignal
+          signal="BUY"
+          confidence={87}
+          reason="Strong bullish sentiment combined with positive price momentum"
+          targetPrice={195.50}
+          stopLoss={182.30}
+        />
+      ),
+      colSpan: 1
+    },
+    { 
+      id: "sentiment", 
+      component: isLoading ? <SentimentSkeleton /> : (
+        <SentimentAnalysis
+          score={0.68}
+          articles={247}
+          lastUpdate="2 min ago"
+        />
+      ),
+      colSpan: 1
+    },
+  ], [isLoading, selectedSymbol]);
+
+  const [currentOverviewItems, setCurrentOverviewItems] = useState<DashboardItem[]>(overviewItems);
+
+  useEffect(() => {
+    setCurrentOverviewItems(overviewItems);
+  }, [overviewItems]);
+
   return (
-    <div className="min-h-screen bg-background p-6">
+    <div className="min-h-screen bg-background p-6 theme-transition">
       <div className="max-w-7xl mx-auto space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between pb-6 mb-6 border-b border-border/50">
@@ -197,6 +281,8 @@ const Index = () => {
             </div>
           </div>
           <div className="flex items-center gap-3">
+            <KeyboardShortcutsHelp />
+            <ThemeToggle />
             <Card className={`flex items-center gap-3 px-4 py-2 transition-all ${
               autotradeEnabled ? 'bg-bullish/10 border-bullish/30' : 'bg-card/50 border-border'
             }`}>
@@ -227,7 +313,7 @@ const Index = () => {
         <MarketDataStatus />
 
         {/* Main Content */}
-        <Tabs defaultValue="overview" className="space-y-6">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
           <div className="bg-card/30 backdrop-blur-sm rounded-lg p-1 border border-border/50">
             <TabsList className="w-full flex flex-wrap justify-start gap-1 bg-transparent">
               <TabsTrigger value="overview" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
@@ -271,22 +357,11 @@ const Index = () => {
             </TabsList>
           </div>
 
-          <TabsContent value="overview" className="space-y-6">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <MarketData symbol={selectedSymbol} />
-              <TradingSignal
-                signal="BUY"
-                confidence={87}
-                reason="Strong bullish sentiment combined with positive price momentum"
-                targetPrice={195.50}
-                stopLoss={182.30}
-              />
-              <SentimentAnalysis
-                score={0.68}
-                articles={247}
-                lastUpdate="2 min ago"
-              />
-            </div>
+          <TabsContent value="overview" className="space-y-6 animate-fade-in">
+            <DraggableDashboard 
+              items={currentOverviewItems}
+              onReorder={setCurrentOverviewItems}
+            />
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <RiskManager
@@ -296,57 +371,59 @@ const Index = () => {
                 onRiskPerTradeChange={setRiskPerTrade}
               />
               <OrderEntry />
-              <Watchlist
-                items={watchlistItems}
-                onRemove={handleRemoveFromWatchlist}
-                onSelect={handleSelectSymbol}
-                onAdd={handleAddToWatchlist}
-              />
+              {isLoading ? <WatchlistSkeleton /> : (
+                <Watchlist
+                  items={watchlistItems}
+                  onRemove={handleRemoveFromWatchlist}
+                  onSelect={handleSelectSymbol}
+                  onAdd={handleAddToWatchlist}
+                />
+              )}
             </div>
           </TabsContent>
 
-          <TabsContent value="portfolio">
+          <TabsContent value="portfolio" className="animate-fade-in">
             <Portfolio />
           </TabsContent>
 
-          <TabsContent value="charts">
+          <TabsContent value="charts" className="animate-fade-in">
             <HistoricalChart symbol={selectedSymbol} />
           </TabsContent>
 
-          <TabsContent value="comparison">
+          <TabsContent value="comparison" className="animate-fade-in">
             <StockComparison />
           </TabsContent>
 
-          <TabsContent value="history">
+          <TabsContent value="history" className="animate-fade-in">
             <TradingHistory />
           </TabsContent>
 
-          <TabsContent value="backtest">
+          <TabsContent value="backtest" className="animate-fade-in">
             <Backtesting />
           </TabsContent>
 
-          <TabsContent value="alerts">
+          <TabsContent value="alerts" className="animate-fade-in">
             <PriceAlerts />
           </TabsContent>
 
-          <TabsContent value="strategy">
+          <TabsContent value="strategy" className="animate-fade-in">
             <StrategyBuilder />
           </TabsContent>
 
-          <TabsContent value="paper">
+          <TabsContent value="paper" className="animate-fade-in">
             <PaperTrading />
           </TabsContent>
 
-          <TabsContent value="advanced">
+          <TabsContent value="advanced" className="animate-fade-in">
             <AdvancedChart symbol={selectedSymbol} />
           </TabsContent>
 
-          <TabsContent value="news">
+          <TabsContent value="news" className="animate-fade-in">
             <NewsArticles symbol={selectedSymbol} />
           </TabsContent>
 
           {isAdmin && (
-            <TabsContent value="admin">
+            <TabsContent value="admin" className="animate-fade-in">
               <AdminApproval />
             </TabsContent>
           )}
