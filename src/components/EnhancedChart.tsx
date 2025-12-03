@@ -12,6 +12,7 @@ import {
   ZoomIn, ZoomOut, RefreshCw, Maximize2
 } from "lucide-react";
 import { calculateSMA, calculateEMA, calculateBollingerBands } from "@/lib/tradingAlgorithms";
+import { useMarketData } from "@/hooks/useMarketData";
 
 interface EnhancedChartProps {
   symbol: string;
@@ -144,15 +145,18 @@ export const EnhancedChart = ({ symbol }: EnhancedChartProps) => {
     vwap: false,
   });
   const [timeframe, setTimeframe] = useState<"1D" | "1W" | "1M" | "3M">("1M");
+  const { data: marketData } = useMarketData(symbol);
 
   useEffect(() => {
     setLoading(true);
     const daysMap = { "1D": 24, "1W": 35, "1M": 60, "3M": 90 };
+    // Use real market price if available
+    const currentPrice = marketData?.price ?? 187.35;
     setTimeout(() => {
-      setData(generateMockData(187.35, daysMap[timeframe]));
+      setData(generateMockData(currentPrice, daysMap[timeframe]));
       setLoading(false);
     }, 300);
-  }, [symbol, timeframe]);
+  }, [symbol, timeframe, marketData?.price]);
 
   const stats = useMemo(() => {
     if (data.length === 0) return null;
