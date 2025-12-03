@@ -10,6 +10,7 @@ import { PendingApproval } from "@/components/PendingApproval";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import Settings from "./pages/Settings";
+import Autotrade from "./pages/Autotrade";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -38,6 +39,14 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <Settings />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/autotrade"
+              element={
+                <ProtectedRoute>
+                  <Autotrade />
                 </ProtectedRoute>
               }
             />

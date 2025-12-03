@@ -5,6 +5,7 @@ import { RiskManager } from "@/components/RiskManager";
 import { OrderEntry } from "@/components/OrderEntry";
 import { Watchlist } from "@/components/Watchlist";
 import { Portfolio } from "@/components/Portfolio";
+import { PortfolioAnalytics } from "@/components/PortfolioAnalytics";
 import { TradingHistory } from "@/components/TradingHistory";
 import { Backtesting } from "@/components/Backtesting";
 import { PriceAlerts } from "@/components/PriceAlerts";
@@ -27,7 +28,7 @@ import {
 } from "@/components/DashboardSkeleton";
 import { usePriceAlertNotifications } from "@/hooks/usePriceAlertNotifications";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
-import { Activity, Settings as SettingsIcon, Bell, ShoppingCart } from "lucide-react";
+import { Activity, Settings as SettingsIcon, Bell, ShoppingCart, Zap, BarChart3 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
@@ -39,7 +40,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useMarketData } from "@/hooks/useMarketData";
 
-const TABS = ["overview", "portfolio", "charts", "comparison", "history", "backtest", "alerts", "news", "strategy", "paper", "advanced"];
+const TABS = ["overview", "portfolio", "analytics", "charts", "comparison", "history", "backtest", "alerts", "news", "strategy", "paper", "advanced"];
 
 const Index = () => {
   const [accountSize, setAccountSize] = useState(10000);
@@ -354,6 +355,10 @@ const Index = () => {
                 )}
               </Label>
             </Card>
+            <Button variant="outline" onClick={() => navigate("/autotrade")} className="hover:bg-accent/10 hover:text-accent transition-colors">
+              <Zap className="h-4 w-4 mr-2" />
+              Autotrade
+            </Button>
             <Button variant="outline" onClick={() => navigate("/settings")} className="hover:bg-primary/10 hover:text-primary transition-colors">
               <SettingsIcon className="h-4 w-4 mr-2" />
               Settings
@@ -376,6 +381,9 @@ const Index = () => {
               </TabsTrigger>
               <TabsTrigger value="portfolio" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
                 Portfolio
+              </TabsTrigger>
+              <TabsTrigger value="analytics" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                Analytics
               </TabsTrigger>
               <TabsTrigger value="charts" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
                 Intraday Chart
@@ -439,6 +447,10 @@ const Index = () => {
 
           <TabsContent value="portfolio" className="animate-fade-in">
             <Portfolio />
+          </TabsContent>
+
+          <TabsContent value="analytics" className="animate-fade-in">
+            <PortfolioAnalytics />
           </TabsContent>
 
           <TabsContent value="charts" className="animate-fade-in">
