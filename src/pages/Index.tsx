@@ -300,11 +300,7 @@ const Index = () => {
     { 
       id: "sentiment", 
       component: isLoading ? <SentimentSkeleton /> : (
-        <SentimentAnalysis
-          score={0.68}
-          articles={247}
-          lastUpdate="2 min ago"
-        />
+        <SentimentAnalysis symbol={selectedSymbol} />
       ),
       colSpan: 1
     },

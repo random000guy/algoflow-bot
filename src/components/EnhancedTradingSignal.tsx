@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { generateTradingSignal, TradingSignal, PriceData } from "@/lib/tradingAlgorithms";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { useMarketData } from "@/hooks/useMarketData";
 
 interface EnhancedTradingSignalProps {
   symbol: string;
@@ -46,11 +47,14 @@ export const EnhancedTradingSignal = ({ symbol, priceData }: EnhancedTradingSign
   const [signal, setSignal] = useState<TradingSignal | null>(null);
   const [loading, setLoading] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
+  const { data: marketData } = useMarketData(symbol);
 
   const calculateSignal = () => {
     setLoading(true);
     setTimeout(() => {
-      const data = priceData || generateMockPriceData(187.35);
+      // Use real market price if available, otherwise use a reasonable default
+      const currentPrice = marketData?.price ?? 187.35;
+      const data = priceData || generateMockPriceData(currentPrice);
       const newSignal = generateTradingSignal(data);
       setSignal(newSignal);
       setLoading(false);
@@ -59,7 +63,7 @@ export const EnhancedTradingSignal = ({ symbol, priceData }: EnhancedTradingSign
 
   useEffect(() => {
     calculateSignal();
-  }, [symbol, priceData]);
+  }, [symbol, priceData, marketData?.price]);
 
   if (!signal) {
     return (

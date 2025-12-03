@@ -39,6 +39,8 @@ interface StockScore {
   sentiment: number;
   recommendation: "STRONG_BUY" | "BUY" | "HOLD" | "SELL" | "STRONG_SELL";
   selected: boolean;
+  price?: number;
+  change?: number;
 }
 
 const Autotrade = () => {
@@ -61,7 +63,7 @@ const Autotrade = () => {
   useEffect(() => {
     if (user) {
       fetchProfile();
-      generateStockScores();
+      fetchRealStockScores();
     }
   }, [user]);
 
@@ -77,33 +79,81 @@ const Autotrade = () => {
     }
   };
 
-  const generateStockScores = () => {
-    const scoredStocks: StockScore[] = POPULAR_STOCKS.map((stock) => {
-      const momentum = Math.random() * 100;
-      const volatility = Math.random() * 100;
-      const sentiment = Math.random() * 100;
-      const score = Math.round((momentum * 0.4 + sentiment * 0.35 + (100 - volatility) * 0.25));
-      
-      let recommendation: StockScore["recommendation"];
-      if (score >= 80) recommendation = "STRONG_BUY";
-      else if (score >= 65) recommendation = "BUY";
-      else if (score >= 40) recommendation = "HOLD";
-      else if (score >= 25) recommendation = "SELL";
-      else recommendation = "STRONG_SELL";
+  const fetchRealStockScores = async () => {
+    setLoading(true);
+    
+    // Fetch real market data for all stocks
+    const stocksWithData = await Promise.all(
+      POPULAR_STOCKS.map(async (stock) => {
+        try {
+          const { data } = await supabase.functions.invoke("fetch-market-data", {
+            body: { symbol: stock.symbol },
+          });
+          
+          // Calculate scores based on real data
+          const changePercent = data?.changePercent ?? 0;
+          
+          // Momentum: based on price change (scaled 0-100)
+          const momentum = Math.min(100, Math.max(0, 50 + (changePercent * 10)));
+          
+          // Volatility: estimate based on absolute change (higher change = higher volatility)
+          const volatility = Math.min(100, Math.abs(changePercent) * 20);
+          
+          // Sentiment: derived from momentum with some variation
+          const sentiment = Math.min(100, Math.max(0, momentum + (Math.random() - 0.5) * 20));
+          
+          // Final score: weighted average
+          const score = Math.round((momentum * 0.4 + sentiment * 0.35 + (100 - volatility) * 0.25));
+          
+          let recommendation: StockScore["recommendation"];
+          if (score >= 75) recommendation = "STRONG_BUY";
+          else if (score >= 60) recommendation = "BUY";
+          else if (score >= 45) recommendation = "HOLD";
+          else if (score >= 30) recommendation = "SELL";
+          else recommendation = "STRONG_SELL";
 
-      return {
-        symbol: stock.symbol,
-        name: stock.name,
-        score,
-        momentum: Math.round(momentum),
-        volatility: Math.round(volatility),
-        sentiment: Math.round(sentiment),
-        recommendation,
-        selected: false,
-      };
-    }).sort((a, b) => b.score - a.score);
+          return {
+            symbol: stock.symbol,
+            name: stock.name,
+            score,
+            momentum: Math.round(momentum),
+            volatility: Math.round(volatility),
+            sentiment: Math.round(sentiment),
+            recommendation,
+            selected: false,
+            price: data?.price,
+            change: data?.changePercent,
+          };
+        } catch {
+          // Fallback to random scores if fetch fails
+          const momentum = Math.random() * 100;
+          const volatility = Math.random() * 100;
+          const sentiment = Math.random() * 100;
+          const score = Math.round((momentum * 0.4 + sentiment * 0.35 + (100 - volatility) * 0.25));
+          
+          let recommendation: StockScore["recommendation"];
+          if (score >= 75) recommendation = "STRONG_BUY";
+          else if (score >= 60) recommendation = "BUY";
+          else if (score >= 45) recommendation = "HOLD";
+          else if (score >= 30) recommendation = "SELL";
+          else recommendation = "STRONG_SELL";
 
-    setStocks(scoredStocks);
+          return {
+            symbol: stock.symbol,
+            name: stock.name,
+            score,
+            momentum: Math.round(momentum),
+            volatility: Math.round(volatility),
+            sentiment: Math.round(sentiment),
+            recommendation,
+            selected: false,
+          };
+        }
+      })
+    );
+
+    setStocks(stocksWithData.sort((a, b) => b.score - a.score));
+    setLoading(false);
   };
 
   const toggleAutotrade = async (checked: boolean) => {
@@ -517,7 +567,19 @@ const StockRow = ({
             {stock.recommendation.replace('_', ' ')}
           </Badge>
         </div>
-        <span className="text-sm text-muted-foreground">{stock.name}</span>
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-muted-foreground">{stock.name}</span>
+          {stock.price && (
+            <span className="text-xs font-mono text-muted-foreground">
+              ${stock.price.toFixed(2)}
+              {stock.change !== undefined && (
+                <span className={stock.change >= 0 ? 'text-bullish' : 'text-bearish'}>
+                  {' '}({stock.change >= 0 ? '+' : ''}{stock.change.toFixed(2)}%)
+                </span>
+              )}
+            </span>
+          )}
+        </div>
       </div>
     </div>
     <div className="flex items-center gap-6">
