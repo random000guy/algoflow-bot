@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { MarketData } from "@/components/MarketData";
 import { SentimentAnalysis } from "@/components/SentimentAnalysis";
 import { RiskManager } from "@/components/RiskManager";
@@ -20,6 +20,9 @@ import { KeyboardShortcutsHelp } from "@/components/KeyboardShortcutsHelp";
 import { DraggableDashboard, DashboardItem } from "@/components/DraggableDashboard";
 import { EnhancedTradingSignal } from "@/components/EnhancedTradingSignal";
 import { EnhancedChart } from "@/components/EnhancedChart";
+import { MarketHeatmap } from "@/components/MarketHeatmap";
+import { PositionSizingCalculator } from "@/components/PositionSizingCalculator";
+import { TradeJournal } from "@/components/TradeJournal";
 import { 
   MarketDataSkeleton, 
   TradingSignalSkeleton, 
@@ -28,7 +31,8 @@ import {
 } from "@/components/DashboardSkeleton";
 import { usePriceAlertNotifications } from "@/hooks/usePriceAlertNotifications";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
-import { Activity, Settings as SettingsIcon, Bell, ShoppingCart, Zap, BarChart3 } from "lucide-react";
+import { useAutoRefresh } from "@/hooks/useAutoRefresh";
+import { Activity, Settings as SettingsIcon, RefreshCw, Zap, Timer } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
@@ -40,7 +44,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useMarketData } from "@/hooks/useMarketData";
 
-const TABS = ["overview", "portfolio", "analytics", "charts", "comparison", "history", "backtest", "alerts", "news", "strategy", "paper", "advanced"];
+const TABS = ["overview", "heatmap", "portfolio", "analytics", "charts", "comparison", "history", "backtest", "alerts", "news", "strategy", "paper", "journal", "tools", "advanced"];
 
 const Index = () => {
   const [accountSize, setAccountSize] = useState(10000);
@@ -54,9 +58,29 @@ const Index = () => {
   const [isAdmin, setIsAdmin] = useState(false);
   const [selectedSymbol, setSelectedSymbol] = useState("AAPL");
   const { refetch: refetchMarketData } = useMarketData(selectedSymbol);
+  const [refreshKey, setRefreshKey] = useState(0);
   
   // Enable price alert notifications
   usePriceAlertNotifications();
+
+  // Auto-refresh functionality
+  const handleGlobalRefresh = useCallback(async () => {
+    await refetchMarketData();
+    await fetchWatchlist();
+    setRefreshKey(prev => prev + 1);
+  }, []);
+
+  const { 
+    isRefreshing, 
+    autoRefreshEnabled, 
+    toggleAutoRefresh, 
+    refresh, 
+    secondsUntilRefresh 
+  } = useAutoRefresh({
+    onRefresh: handleGlobalRefresh,
+    interval: 30,
+    enabled: false,
+  });
 
   const [watchlistItems, setWatchlistItems] = useState<Array<{ symbol: string; price: number; change: number }>>([]);
   const [showQuickOrder, setShowQuickOrder] = useState(false);
@@ -66,11 +90,13 @@ const Index = () => {
   const shortcuts = useMemo(() => [
     {
       key: "r",
-      action: () => {
-        refetchMarketData();
-        toast({ title: "Refreshing data...", duration: 1500 });
-      },
-      description: "Refresh market data",
+      action: () => refresh(),
+      description: "Refresh all data",
+    },
+    {
+      key: "f",
+      action: () => toggleAutoRefresh(),
+      description: "Toggle auto-refresh",
     },
     {
       key: "t",
@@ -147,7 +173,7 @@ const Index = () => {
       action: () => setActiveTab(tab),
       description: `Switch to ${tab} tab`,
     })),
-  ], [autotradeEnabled, navigate, refetchMarketData, toast, selectedSymbol]);
+  ], [autotradeEnabled, navigate, refresh, toggleAutoRefresh, toast, selectedSymbol]);
 
   useKeyboardShortcuts(shortcuts);
 
@@ -351,6 +377,25 @@ const Index = () => {
                 )}
               </Label>
             </Card>
+            <Button 
+              variant={autoRefreshEnabled ? "default" : "outline"} 
+              size="sm"
+              onClick={() => refresh()}
+              disabled={isRefreshing}
+              className="gap-1"
+            >
+              <RefreshCw className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`} />
+              {autoRefreshEnabled && <span className="text-xs">{secondsUntilRefresh}s</span>}
+            </Button>
+            <Button
+              variant={autoRefreshEnabled ? "default" : "outline"}
+              size="sm"
+              onClick={toggleAutoRefresh}
+              className="gap-1"
+            >
+              <Timer className="h-4 w-4" />
+              Auto
+            </Button>
             <Button variant="outline" onClick={() => navigate("/autotrade")} className="hover:bg-accent/10 hover:text-accent transition-colors">
               <Zap className="h-4 w-4 mr-2" />
               Autotrade
@@ -374,6 +419,9 @@ const Index = () => {
             <TabsList className="w-full flex flex-wrap justify-start gap-1 bg-transparent">
               <TabsTrigger value="overview" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
                 Overview
+              </TabsTrigger>
+              <TabsTrigger value="heatmap" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                Heatmap
               </TabsTrigger>
               <TabsTrigger value="portfolio" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
                 Portfolio
@@ -400,13 +448,19 @@ const Index = () => {
                 News
               </TabsTrigger>
               <TabsTrigger value="strategy" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-                Strategy Builder
+                Strategy
               </TabsTrigger>
               <TabsTrigger value="paper" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-                Paper Trading
+                Paper Trade
+              </TabsTrigger>
+              <TabsTrigger value="journal" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                Journal
+              </TabsTrigger>
+              <TabsTrigger value="tools" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                Tools
               </TabsTrigger>
               <TabsTrigger value="advanced" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-                Advanced Charts
+                Advanced
               </TabsTrigger>
               {isAdmin && (
                 <TabsTrigger value="admin" className="data-[state=active]:bg-destructive data-[state=active]:text-destructive-foreground">
@@ -416,7 +470,7 @@ const Index = () => {
             </TabsList>
           </div>
 
-          <TabsContent value="overview" className="space-y-6 animate-fade-in">
+          <TabsContent value="overview" className="space-y-6 animate-fade-in" key={`overview-${refreshKey}`}>
             <DraggableDashboard 
               items={currentOverviewItems}
               onReorder={setCurrentOverviewItems}
@@ -441,47 +495,59 @@ const Index = () => {
             </div>
           </TabsContent>
 
-          <TabsContent value="portfolio" className="animate-fade-in">
+          <TabsContent value="heatmap" className="animate-fade-in" key={`heatmap-${refreshKey}`}>
+            <MarketHeatmap />
+          </TabsContent>
+
+          <TabsContent value="portfolio" className="animate-fade-in" key={`portfolio-${refreshKey}`}>
             <Portfolio />
           </TabsContent>
 
-          <TabsContent value="analytics" className="animate-fade-in">
+          <TabsContent value="analytics" className="animate-fade-in" key={`analytics-${refreshKey}`}>
             <PortfolioAnalytics />
           </TabsContent>
 
-          <TabsContent value="charts" className="animate-fade-in">
+          <TabsContent value="charts" className="animate-fade-in" key={`charts-${refreshKey}`}>
             <EnhancedChart symbol={selectedSymbol} />
           </TabsContent>
 
-          <TabsContent value="comparison" className="animate-fade-in">
+          <TabsContent value="comparison" className="animate-fade-in" key={`comparison-${refreshKey}`}>
             <StockComparison />
           </TabsContent>
 
-          <TabsContent value="history" className="animate-fade-in">
+          <TabsContent value="history" className="animate-fade-in" key={`history-${refreshKey}`}>
             <TradingHistory />
           </TabsContent>
 
-          <TabsContent value="backtest" className="animate-fade-in">
+          <TabsContent value="backtest" className="animate-fade-in" key={`backtest-${refreshKey}`}>
             <Backtesting />
           </TabsContent>
 
-          <TabsContent value="alerts" className="animate-fade-in">
+          <TabsContent value="alerts" className="animate-fade-in" key={`alerts-${refreshKey}`}>
             <PriceAlerts />
           </TabsContent>
 
-          <TabsContent value="strategy" className="animate-fade-in">
+          <TabsContent value="strategy" className="animate-fade-in" key={`strategy-${refreshKey}`}>
             <StrategyBuilder />
           </TabsContent>
 
-          <TabsContent value="paper" className="animate-fade-in">
+          <TabsContent value="paper" className="animate-fade-in" key={`paper-${refreshKey}`}>
             <PaperTrading />
           </TabsContent>
 
-          <TabsContent value="advanced" className="animate-fade-in">
+          <TabsContent value="journal" className="animate-fade-in" key={`journal-${refreshKey}`}>
+            <TradeJournal />
+          </TabsContent>
+
+          <TabsContent value="tools" className="animate-fade-in" key={`tools-${refreshKey}`}>
+            <PositionSizingCalculator />
+          </TabsContent>
+
+          <TabsContent value="advanced" className="animate-fade-in" key={`advanced-${refreshKey}`}>
             <EnhancedChart symbol={selectedSymbol} />
           </TabsContent>
 
-          <TabsContent value="news" className="animate-fade-in">
+          <TabsContent value="news" className="animate-fade-in" key={`news-${refreshKey}`}>
             <NewsArticles symbol={selectedSymbol} />
           </TabsContent>
 
