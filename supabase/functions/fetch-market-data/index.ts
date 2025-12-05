@@ -123,6 +123,74 @@ Deno.serve(async (req) => {
           );
         }
         break;
+
+      case 'polygon':
+      case 'massive':
+        const pgUrl = `https://api.polygon.io/v2/aggs/ticker/${symbol}/prev?adjusted=true&apiKey=${config.api_key_encrypted}`;
+        const pgResponse = await fetch(pgUrl);
+        const pgData = await pgResponse.json();
+        
+        console.log('Polygon/Massive response for', symbol, ':', JSON.stringify(pgData));
+        
+        if (pgData.status === 'ERROR' || pgData.error) {
+          return new Response(
+            JSON.stringify({ error: `Polygon API error: ${pgData.error || pgData.message}` }),
+            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+        
+        if (pgData.results && pgData.results.length > 0) {
+          const result = pgData.results[0];
+          marketData = {
+            symbol: symbol,
+            price: result.c,
+            change: result.c - result.o,
+            changePercent: ((result.c - result.o) / result.o) * 100,
+            volume: result.v?.toString() || 'N/A',
+            timestamp: new Date(result.t).toISOString(),
+          };
+        } else {
+          return new Response(
+            JSON.stringify({ 
+              error: `No data available for ${symbol}. The symbol may be invalid.` 
+            }),
+            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+        break;
+
+      case 'iex_cloud':
+        const iexUrl = `https://cloud.iexapis.com/stable/stock/${symbol}/quote?token=${config.api_key_encrypted}`;
+        const iexResponse = await fetch(iexUrl);
+        const iexData = await iexResponse.json();
+        
+        console.log('IEX Cloud response for', symbol, ':', JSON.stringify(iexData));
+        
+        if (iexData.error) {
+          return new Response(
+            JSON.stringify({ error: `IEX Cloud API error: ${iexData.error}` }),
+            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+        
+        if (iexData.latestPrice) {
+          marketData = {
+            symbol: iexData.symbol,
+            price: iexData.latestPrice,
+            change: iexData.change || 0,
+            changePercent: iexData.changePercent ? iexData.changePercent * 100 : 0,
+            volume: iexData.volume?.toString() || 'N/A',
+            timestamp: iexData.latestUpdate ? new Date(iexData.latestUpdate).toISOString() : new Date().toISOString(),
+          };
+        } else {
+          return new Response(
+            JSON.stringify({ 
+              error: `No data available for ${symbol}.` 
+            }),
+            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+        break;
         
       default:
         return new Response(

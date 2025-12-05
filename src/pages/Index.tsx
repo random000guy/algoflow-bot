@@ -23,6 +23,7 @@ import { EnhancedChart } from "@/components/EnhancedChart";
 import { MarketHeatmap } from "@/components/MarketHeatmap";
 import { PositionSizingCalculator } from "@/components/PositionSizingCalculator";
 import { TradeJournal } from "@/components/TradeJournal";
+import { RiskAnalytics } from "@/components/RiskAnalytics";
 import { 
   MarketDataSkeleton, 
   TradingSignalSkeleton, 
@@ -44,7 +45,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useMarketData } from "@/hooks/useMarketData";
 
-const TABS = ["overview", "heatmap", "portfolio", "analytics", "charts", "comparison", "history", "backtest", "alerts", "news", "strategy", "paper", "journal", "tools", "advanced"];
+const TABS = ["overview", "heatmap", "portfolio", "analytics", "risk", "charts", "comparison", "history", "backtest", "alerts", "news", "strategy", "paper", "journal", "tools", "advanced"];
 
 const Index = () => {
   const [accountSize, setAccountSize] = useState(10000);
@@ -429,6 +430,9 @@ const Index = () => {
               <TabsTrigger value="analytics" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
                 Analytics
               </TabsTrigger>
+              <TabsTrigger value="risk" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                Risk
+              </TabsTrigger>
               <TabsTrigger value="charts" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
                 Intraday Chart
               </TabsTrigger>
@@ -505,6 +509,10 @@ const Index = () => {
 
           <TabsContent value="analytics" className="animate-fade-in" key={`analytics-${refreshKey}`}>
             <PortfolioAnalytics />
+          </TabsContent>
+
+          <TabsContent value="risk" className="animate-fade-in" key={`risk-${refreshKey}`}>
+            <RiskAnalytics />
           </TabsContent>
 
           <TabsContent value="charts" className="animate-fade-in" key={`charts-${refreshKey}`}>
