@@ -45,16 +45,27 @@ Deno.serve(async (req) => {
 
     console.log('Fetching news for symbol:', symbol);
 
-    // Get user's active market data config
-    const { data: config, error: configError } = await supabase
+    // Get user's active market data config (pick most recently updated if multiple)
+    const { data: configs, error: configError } = await supabase
       .from('market_data_configs')
       .select('provider, api_key_encrypted')
       .eq('user_id', user.id)
       .eq('is_active', true)
-      .single();
+      .order('updated_at', { ascending: false })
+      .limit(1);
 
-    if (configError || !config) {
-      console.error('No active config found:', configError);
+    if (configError) {
+      console.error('Config fetch error:', configError);
+      return new Response(
+        JSON.stringify({ error: 'Failed to fetch market data configuration.' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const config = configs && configs.length > 0 ? configs[0] : null;
+
+    if (!config || !config.api_key_encrypted) {
+      console.error('No active config found');
       return new Response(
         JSON.stringify({ 
           error: 'No active market data provider configured. Please add an API key in Settings.' 
@@ -62,6 +73,8 @@ Deno.serve(async (req) => {
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+    
+    console.log('Using provider for news:', config.provider);
 
     let newsData;
 
