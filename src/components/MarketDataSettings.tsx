@@ -94,6 +94,7 @@ export const MarketDataSettings = () => {
               <SelectItem value="finnhub">Finnhub</SelectItem>
               <SelectItem value="iex_cloud">IEX Cloud</SelectItem>
               <SelectItem value="polygon">Polygon.io</SelectItem>
+              <SelectItem value="massive">Massive.com (Polygon)</SelectItem>
             </SelectContent>
           </Select>
           <p className="text-xs text-muted-foreground">
@@ -128,6 +129,7 @@ export const MarketDataSettings = () => {
           <li>• Finnhub: <a href="https://finnhub.io/register" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Sign up for free</a></li>
           <li>• IEX Cloud: <a href="https://iexcloud.io/cloud-login#/register" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Create account</a></li>
           <li>• Polygon.io: <a href="https://polygon.io/dashboard/signup" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Register here</a></li>
+          <li>• Massive.com: <a href="https://massive.com/dashboard/signup" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Sign up (Pro)</a></li>
         </ul>
       </div>
     </Card>
