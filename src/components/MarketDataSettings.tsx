@@ -6,15 +6,22 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { TrendingUp, Check, Trash2 } from "lucide-react";
+import { TrendingUp, Check, Trash2, Loader2, CheckCircle, XCircle } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
 
 interface ConfiguredProvider {
   id: string;
   provider: string;
   is_active: boolean;
   updated_at: string;
+}
+
+interface RateLimitInfo {
+  remaining: number;
+  limit: number;
+  resetTime?: string;
 }
 
 const providerNames: Record<string, string> = {
@@ -25,11 +32,22 @@ const providerNames: Record<string, string> = {
   massive: "Massive.com (Polygon)",
 };
 
+const providerRateLimits: Record<string, { limit: number; period: string }> = {
+  alpha_vantage: { limit: 5, period: "minute" },
+  finnhub: { limit: 60, period: "minute" },
+  iex_cloud: { limit: 100, period: "second" },
+  polygon: { limit: 5, period: "minute" },
+  massive: { limit: 5, period: "minute" },
+};
+
 export const MarketDataSettings = () => {
   const [provider, setProvider] = useState("alpha_vantage");
   const [apiKey, setApiKey] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [configuredProviders, setConfiguredProviders] = useState<ConfiguredProvider[]>([]);
+  const [testingProvider, setTestingProvider] = useState<string | null>(null);
+  const [testResults, setTestResults] = useState<Record<string, "success" | "error" | null>>({});
+  const [rateLimits, setRateLimits] = useState<Record<string, RateLimitInfo>>({});
   const { toast } = useToast();
   const { user } = useAuth();
 
@@ -43,12 +61,82 @@ export const MarketDataSettings = () => {
     
     if (data) {
       setConfiguredProviders(data);
+      // Initialize rate limits for each provider
+      const limits: Record<string, RateLimitInfo> = {};
+      data.forEach(config => {
+        const providerLimit = providerRateLimits[config.provider];
+        if (providerLimit) {
+          limits[config.id] = {
+            remaining: providerLimit.limit,
+            limit: providerLimit.limit,
+          };
+        }
+      });
+      setRateLimits(limits);
     }
   };
 
   useEffect(() => {
     fetchConfiguredProviders();
   }, [user]);
+
+  const handleTestConnection = async (configId: string, providerType: string) => {
+    setTestingProvider(configId);
+    setTestResults(prev => ({ ...prev, [configId]: null }));
+
+    try {
+      // Temporarily set this as active to test it
+      const { error: activateError } = await supabase
+        .from("market_data_configs")
+        .update({ is_active: true })
+        .eq("id", configId);
+
+      if (activateError) throw activateError;
+
+      // Make a test API call
+      const { data, error } = await supabase.functions.invoke("fetch-market-data", {
+        body: { symbol: "AAPL" },
+      });
+
+      // Restore previous active states
+      await fetchConfiguredProviders();
+
+      if (error || data?.error) {
+        setTestResults(prev => ({ ...prev, [configId]: "error" }));
+        toast({
+          title: "Connection Failed",
+          description: data?.error || error?.message || "Could not connect to provider",
+          variant: "destructive",
+        });
+      } else {
+        setTestResults(prev => ({ ...prev, [configId]: "success" }));
+        // Update rate limit estimate
+        const providerLimit = providerRateLimits[providerType];
+        if (providerLimit) {
+          setRateLimits(prev => ({
+            ...prev,
+            [configId]: {
+              remaining: Math.max(0, (prev[configId]?.remaining ?? providerLimit.limit) - 1),
+              limit: providerLimit.limit,
+            }
+          }));
+        }
+        toast({
+          title: "Connection Successful",
+          description: `${providerNames[providerType]} is working correctly. Price: $${data?.price}`,
+        });
+      }
+    } catch (err: any) {
+      setTestResults(prev => ({ ...prev, [configId]: "error" }));
+      toast({
+        title: "Test Failed",
+        description: err.message,
+        variant: "destructive",
+      });
+    } finally {
+      setTestingProvider(null);
+    }
+  };
 
   const handleSetPrimary = async (configId: string) => {
     if (!user) return;
@@ -185,45 +273,87 @@ export const MarketDataSettings = () => {
       {configuredProviders.length > 0 && (
         <div className="mb-6 space-y-2">
           <Label className="text-sm font-medium">Configured Providers</Label>
-          <div className="space-y-2">
-            {configuredProviders.map((config) => (
-              <div
-                key={config.id}
-                className="flex items-center justify-between p-3 rounded-lg bg-background/50 border border-border"
-              >
-                <div className="flex items-center gap-2">
-                  <span className="font-medium text-sm">
-                    {providerNames[config.provider] || config.provider}
-                  </span>
-                  {config.is_active && (
-                    <Badge variant="default" className="text-xs">
-                      Primary
-                    </Badge>
+          <div className="space-y-3">
+            {configuredProviders.map((config) => {
+              const providerLimit = providerRateLimits[config.provider];
+              const rateInfo = rateLimits[config.id];
+              const usagePercent = rateInfo 
+                ? ((rateInfo.limit - rateInfo.remaining) / rateInfo.limit) * 100 
+                : 0;
+
+              return (
+                <div
+                  key={config.id}
+                  className="p-3 rounded-lg bg-background/50 border border-border space-y-2"
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium text-sm">
+                        {providerNames[config.provider] || config.provider}
+                      </span>
+                      {config.is_active && (
+                        <Badge variant="default" className="text-xs">
+                          Primary
+                        </Badge>
+                      )}
+                      {testResults[config.id] === "success" && (
+                        <CheckCircle className="h-4 w-4 text-bullish" />
+                      )}
+                      {testResults[config.id] === "error" && (
+                        <XCircle className="h-4 w-4 text-destructive" />
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleTestConnection(config.id, config.provider)}
+                        disabled={testingProvider === config.id}
+                      >
+                        {testingProvider === config.id ? (
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                        ) : (
+                          "Test"
+                        )}
+                      </Button>
+                      {!config.is_active && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleSetPrimary(config.id)}
+                          disabled={isLoading}
+                        >
+                          <Check className="h-3 w-3 mr-1" />
+                          Set Primary
+                        </Button>
+                      )}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleDeleteProvider(config.id)}
+                        className="text-destructive hover:text-destructive"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  </div>
+                  
+                  {/* Rate Limit Indicator */}
+                  {providerLimit && (
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between text-xs text-muted-foreground">
+                        <span>Rate Limit: {providerLimit.limit} calls/{providerLimit.period}</span>
+                        <span>{rateInfo?.remaining ?? providerLimit.limit} remaining</span>
+                      </div>
+                      <Progress 
+                        value={usagePercent} 
+                        className="h-1.5"
+                      />
+                    </div>
                   )}
                 </div>
-                <div className="flex items-center gap-2">
-                  {!config.is_active && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleSetPrimary(config.id)}
-                      disabled={isLoading}
-                    >
-                      <Check className="h-3 w-3 mr-1" />
-                      Set Primary
-                    </Button>
-                  )}
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleDeleteProvider(config.id)}
-                    className="text-destructive hover:text-destructive"
-                  >
-                    <Trash2 className="h-3 w-3" />
-                  </Button>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
           {activeProvider && (
             <p className="text-xs text-muted-foreground mt-2">
@@ -277,11 +407,11 @@ export const MarketDataSettings = () => {
       <div className="mt-6 p-4 bg-background/50 rounded-lg">
         <h4 className="font-semibold mb-2 text-sm">Getting Started:</h4>
         <ul className="text-xs text-muted-foreground space-y-1">
-          <li>• Alpha Vantage: <a href="https://www.alphavantage.co/support/#api-key" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Get free API key</a></li>
-          <li>• Finnhub: <a href="https://finnhub.io/register" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Sign up for free</a></li>
-          <li>• IEX Cloud: <a href="https://iexcloud.io/cloud-login#/register" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Create account</a></li>
-          <li>• Polygon.io: <a href="https://polygon.io/dashboard/signup" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Register here</a></li>
-          <li>• Massive.com: <a href="https://massive.com/dashboard/signup" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Sign up (Pro)</a></li>
+          <li>• Alpha Vantage: <a href="https://www.alphavantage.co/support/#api-key" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Get free API key</a> (5 calls/min)</li>
+          <li>• Finnhub: <a href="https://finnhub.io/register" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Sign up for free</a> (60 calls/min)</li>
+          <li>• IEX Cloud: <a href="https://iexcloud.io/cloud-login#/register" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Create account</a> (100 calls/sec)</li>
+          <li>• Polygon.io: <a href="https://polygon.io/dashboard/signup" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Register here</a> (5 calls/min)</li>
+          <li>• Massive.com: <a href="https://massive.com/dashboard/signup" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Sign up (Pro)</a> (5 calls/min)</li>
         </ul>
       </div>
     </Card>

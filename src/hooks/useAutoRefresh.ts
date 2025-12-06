@@ -7,11 +7,21 @@ interface UseAutoRefreshOptions {
   enabled?: boolean;
 }
 
-export const useAutoRefresh = ({ onRefresh, interval = 30, enabled = false }: UseAutoRefreshOptions) => {
+export const REFRESH_INTERVALS = [
+  { value: 15, label: "15s" },
+  { value: 30, label: "30s" },
+  { value: 45, label: "45s" },
+  { value: 60, label: "1m" },
+  { value: 120, label: "2m" },
+  { value: 300, label: "5m" },
+];
+
+export const useAutoRefresh = ({ onRefresh, interval: initialInterval = 30, enabled = false }: UseAutoRefreshOptions) => {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(enabled);
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
-  const [secondsUntilRefresh, setSecondsUntilRefresh] = useState(interval);
+  const [interval, setInterval_] = useState(initialInterval);
+  const [secondsUntilRefresh, setSecondsUntilRefresh] = useState(initialInterval);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const countdownRef = useRef<NodeJS.Timeout | null>(null);
   const { toast } = useToast();
@@ -53,6 +63,16 @@ export const useAutoRefresh = ({ onRefresh, interval = 30, enabled = false }: Us
     });
   }, [interval, toast]);
 
+  const setRefreshInterval = useCallback((newInterval: number) => {
+    setInterval_(newInterval);
+    setSecondsUntilRefresh(newInterval);
+    toast({
+      title: "Refresh interval updated",
+      description: `Auto-refresh set to ${newInterval >= 60 ? `${newInterval / 60}m` : `${newInterval}s`}`,
+      duration: 1500,
+    });
+  }, [toast]);
+
   // Auto refresh interval
   useEffect(() => {
     if (autoRefreshEnabled) {
@@ -92,5 +112,7 @@ export const useAutoRefresh = ({ onRefresh, interval = 30, enabled = false }: Us
     refresh,
     lastRefresh,
     secondsUntilRefresh,
+    interval,
+    setRefreshInterval,
   };
 };

@@ -33,7 +33,8 @@ import {
 import { usePriceAlertNotifications } from "@/hooks/usePriceAlertNotifications";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { useAutoRefresh } from "@/hooks/useAutoRefresh";
-import { Activity, Settings as SettingsIcon, RefreshCw, Zap, Timer } from "lucide-react";
+import { Activity, Settings as SettingsIcon, Zap } from "lucide-react";
+import { AutoRefreshControl } from "@/components/AutoRefreshControl";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
@@ -76,7 +77,9 @@ const Index = () => {
     autoRefreshEnabled, 
     toggleAutoRefresh, 
     refresh, 
-    secondsUntilRefresh 
+    secondsUntilRefresh,
+    interval,
+    setRefreshInterval,
   } = useAutoRefresh({
     onRefresh: handleGlobalRefresh,
     interval: 30,
@@ -378,25 +381,15 @@ const Index = () => {
                 )}
               </Label>
             </Card>
-            <Button 
-              variant={autoRefreshEnabled ? "default" : "outline"} 
-              size="sm"
-              onClick={() => refresh()}
-              disabled={isRefreshing}
-              className="gap-1"
-            >
-              <RefreshCw className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`} />
-              {autoRefreshEnabled && <span className="text-xs">{secondsUntilRefresh}s</span>}
-            </Button>
-            <Button
-              variant={autoRefreshEnabled ? "default" : "outline"}
-              size="sm"
-              onClick={toggleAutoRefresh}
-              className="gap-1"
-            >
-              <Timer className="h-4 w-4" />
-              Auto
-            </Button>
+            <AutoRefreshControl
+              isRefreshing={isRefreshing}
+              autoRefreshEnabled={autoRefreshEnabled}
+              secondsUntilRefresh={secondsUntilRefresh}
+              interval={interval}
+              onRefresh={() => refresh()}
+              onToggle={toggleAutoRefresh}
+              onIntervalChange={setRefreshInterval}
+            />
             <Button variant="outline" onClick={() => navigate("/autotrade")} className="hover:bg-accent/10 hover:text-accent transition-colors">
               <Zap className="h-4 w-4 mr-2" />
               Autotrade
