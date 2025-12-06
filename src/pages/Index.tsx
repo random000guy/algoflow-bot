@@ -45,6 +45,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useMarketData } from "@/hooks/useMarketData";
+import { marketDataCache } from "@/lib/marketDataCache";
 
 const TABS = ["overview", "heatmap", "portfolio", "analytics", "risk", "charts", "comparison", "history", "backtest", "alerts", "news", "strategy", "paper", "journal", "tools", "advanced"];
 
@@ -212,36 +213,59 @@ const Index = () => {
       .eq("user_id", user?.id);
 
     if (watchlistData) {
-      // Throttle requests to avoid rate limits - fetch sequentially with delay
+      // Check cache first, only fetch uncached symbols
       const itemsWithPrices: Array<{ symbol: string; price: number; change: number }> = [];
+      const uncachedSymbols: string[] = [];
       
-      for (let i = 0; i < watchlistData.length; i++) {
-        const item = watchlistData[i];
-        try {
-          const { data } = await supabase.functions.invoke("fetch-market-data", {
-            body: { symbol: item.symbol },
-          });
-          
+      // First, collect cached data and identify uncached symbols
+      for (const item of watchlistData) {
+        const cached = marketDataCache.get<{ price: number; changePercent: number }>(item.symbol);
+        if (cached) {
           itemsWithPrices.push({
             symbol: item.symbol,
-            price: data?.price || 0,
-            change: data?.changePercent || 0,
+            price: cached.price || 0,
+            change: cached.changePercent || 0,
           });
-        } catch {
-          itemsWithPrices.push({
-            symbol: item.symbol,
-            price: 0,
-            change: 0,
-          });
-        }
-        
-        // Add delay between requests to respect rate limits (except for last item)
-        if (i < watchlistData.length - 1) {
-          await new Promise(resolve => setTimeout(resolve, 250));
+        } else {
+          uncachedSymbols.push(item.symbol);
         }
       }
       
-      setWatchlistItems(itemsWithPrices);
+      // Fetch uncached symbols with rate limiting (12s delay for Polygon free tier)
+      for (let i = 0; i < uncachedSymbols.length; i++) {
+        const symbol = uncachedSymbols[i];
+        try {
+          const { data } = await supabase.functions.invoke("fetch-market-data", {
+            body: { symbol },
+          });
+          
+          if (data && !data.error) {
+            // Cache the result
+            marketDataCache.set(symbol, data);
+            itemsWithPrices.push({
+              symbol,
+              price: data?.price || 0,
+              change: data?.changePercent || 0,
+            });
+          } else {
+            itemsWithPrices.push({ symbol, price: 0, change: 0 });
+          }
+        } catch {
+          itemsWithPrices.push({ symbol, price: 0, change: 0 });
+        }
+        
+        // 12 second delay between requests to respect 5 req/min limit (except last)
+        if (i < uncachedSymbols.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, 12000));
+        }
+      }
+      
+      // Sort to maintain original order
+      const sortedItems = watchlistData.map(wd => 
+        itemsWithPrices.find(i => i.symbol === wd.symbol) || { symbol: wd.symbol, price: 0, change: 0 }
+      );
+      
+      setWatchlistItems(sortedItems);
     }
   };
 
