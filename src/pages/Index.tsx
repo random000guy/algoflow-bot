@@ -212,27 +212,34 @@ const Index = () => {
       .eq("user_id", user?.id);
 
     if (watchlistData) {
-      const itemsWithPrices = await Promise.all(
-        watchlistData.map(async (item) => {
-          try {
-            const { data } = await supabase.functions.invoke("fetch-market-data", {
-              body: { symbol: item.symbol },
-            });
-            
-            return {
-              symbol: item.symbol,
-              price: data?.price || 0,
-              change: data?.change || 0,
-            };
-          } catch {
-            return {
-              symbol: item.symbol,
-              price: 0,
-              change: 0,
-            };
-          }
-        })
-      );
+      // Throttle requests to avoid rate limits - fetch sequentially with delay
+      const itemsWithPrices: Array<{ symbol: string; price: number; change: number }> = [];
+      
+      for (let i = 0; i < watchlistData.length; i++) {
+        const item = watchlistData[i];
+        try {
+          const { data } = await supabase.functions.invoke("fetch-market-data", {
+            body: { symbol: item.symbol },
+          });
+          
+          itemsWithPrices.push({
+            symbol: item.symbol,
+            price: data?.price || 0,
+            change: data?.changePercent || 0,
+          });
+        } catch {
+          itemsWithPrices.push({
+            symbol: item.symbol,
+            price: 0,
+            change: 0,
+          });
+        }
+        
+        // Add delay between requests to respect rate limits (except for last item)
+        if (i < watchlistData.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, 250));
+        }
+      }
       
       setWatchlistItems(itemsWithPrices);
     }
