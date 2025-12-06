@@ -65,6 +65,7 @@ export type Database = {
           created_at: string | null
           id: string
           is_active: boolean | null
+          priority: number | null
           provider: string
           updated_at: string | null
           user_id: string
@@ -74,6 +75,7 @@ export type Database = {
           created_at?: string | null
           id?: string
           is_active?: boolean | null
+          priority?: number | null
           provider: string
           updated_at?: string | null
           user_id: string
@@ -83,6 +85,7 @@ export type Database = {
           created_at?: string | null
           id?: string
           is_active?: boolean | null
+          priority?: number | null
           provider?: string
           updated_at?: string | null
           user_id?: string

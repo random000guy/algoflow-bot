@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { TrendingUp, Check, Trash2, Loader2, CheckCircle, XCircle } from "lucide-react";
+import { TrendingUp, Trash2, Loader2, CheckCircle, XCircle, ChevronUp, ChevronDown } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
@@ -15,6 +15,7 @@ interface ConfiguredProvider {
   id: string;
   provider: string;
   is_active: boolean;
+  priority: number;
   updated_at: string;
 }
 
@@ -55,9 +56,9 @@ export const MarketDataSettings = () => {
     if (!user) return;
     const { data } = await supabase
       .from("market_data_configs")
-      .select("id, provider, is_active, updated_at")
+      .select("id, provider, is_active, priority, updated_at")
       .eq("user_id", user.id)
-      .order("updated_at", { ascending: false });
+      .order("priority", { ascending: true });
     
     if (data) {
       setConfiguredProviders(data);
@@ -85,21 +86,10 @@ export const MarketDataSettings = () => {
     setTestResults(prev => ({ ...prev, [configId]: null }));
 
     try {
-      // Temporarily set this as active to test it
-      const { error: activateError } = await supabase
-        .from("market_data_configs")
-        .update({ is_active: true })
-        .eq("id", configId);
-
-      if (activateError) throw activateError;
-
       // Make a test API call
       const { data, error } = await supabase.functions.invoke("fetch-market-data", {
         body: { symbol: "AAPL" },
       });
-
-      // Restore previous active states
-      await fetchConfiguredProviders();
 
       if (error || data?.error) {
         setTestResults(prev => ({ ...prev, [configId]: "error" }));
@@ -123,7 +113,7 @@ export const MarketDataSettings = () => {
         }
         toast({
           title: "Connection Successful",
-          description: `${providerNames[providerType]} is working correctly. Price: $${data?.price}`,
+          description: `${providerNames[data.provider || providerType]} returned price: $${data?.price?.toFixed(2)}`,
         });
       }
     } catch (err: any) {
@@ -138,35 +128,49 @@ export const MarketDataSettings = () => {
     }
   };
 
-  const handleSetPrimary = async (configId: string) => {
+  const handleMovePriority = async (configId: string, direction: "up" | "down") => {
     if (!user) return;
     setIsLoading(true);
 
-    // First, deactivate all providers
-    await supabase
-      .from("market_data_configs")
-      .update({ is_active: false })
-      .eq("user_id", user.id);
+    const currentIndex = configuredProviders.findIndex(p => p.id === configId);
+    if (currentIndex === -1) return;
 
-    // Then activate the selected one
-    const { error } = await supabase
-      .from("market_data_configs")
-      .update({ is_active: true, updated_at: new Date().toISOString() })
-      .eq("id", configId);
+    const newIndex = direction === "up" ? currentIndex - 1 : currentIndex + 1;
+    if (newIndex < 0 || newIndex >= configuredProviders.length) {
+      setIsLoading(false);
+      return;
+    }
 
-    if (error) {
+    // Swap priorities
+    const currentProvider = configuredProviders[currentIndex];
+    const swapProvider = configuredProviders[newIndex];
+
+    try {
+      // Update both providers' priorities
+      await Promise.all([
+        supabase
+          .from("market_data_configs")
+          .update({ priority: swapProvider.priority })
+          .eq("id", currentProvider.id),
+        supabase
+          .from("market_data_configs")
+          .update({ priority: currentProvider.priority })
+          .eq("id", swapProvider.id),
+      ]);
+
       toast({
-        title: "Error setting primary provider",
+        title: "Priority updated",
+        description: `${providerNames[currentProvider.provider]} moved ${direction}`,
+      });
+      fetchConfiguredProviders();
+    } catch (error: any) {
+      toast({
+        title: "Error updating priority",
         description: error.message,
         variant: "destructive",
       });
-    } else {
-      toast({
-        title: "Primary provider updated",
-        description: "Your market data will now come from the selected provider.",
-      });
-      fetchConfiguredProviders();
     }
+
     setIsLoading(false);
   };
 
@@ -207,16 +211,18 @@ export const MarketDataSettings = () => {
       .eq("provider", provider)
       .maybeSingle();
 
-    // Deactivate all other providers when adding/updating
-    await supabase
-      .from("market_data_configs")
-      .update({ is_active: false })
-      .eq("user_id", user.id);
+    // Get the next priority number
+    const maxPriority = configuredProviders.length > 0 
+      ? Math.max(...configuredProviders.map(p => p.priority || 0))
+      : 0;
 
     if (existing) {
       const { error } = await supabase
         .from("market_data_configs")
-        .update({ api_key_encrypted: apiKey, is_active: true, updated_at: new Date().toISOString() })
+        .update({ 
+          api_key_encrypted: apiKey, 
+          updated_at: new Date().toISOString() 
+        })
         .eq("id", existing.id);
 
       if (error) {
@@ -228,7 +234,7 @@ export const MarketDataSettings = () => {
       } else {
         toast({
           title: "API Key updated",
-          description: "This provider is now your primary data source.",
+          description: `${providerNames[provider]} configuration updated.`,
         });
         setApiKey("");
         fetchConfiguredProviders();
@@ -239,6 +245,7 @@ export const MarketDataSettings = () => {
         provider: provider,
         api_key_encrypted: apiKey,
         is_active: true,
+        priority: maxPriority + 1,
       });
 
       if (error) {
@@ -249,8 +256,8 @@ export const MarketDataSettings = () => {
         });
       } else {
         toast({
-          title: "API Key saved",
-          description: "This provider is now your primary data source.",
+          title: "Provider added",
+          description: `${providerNames[provider]} added as fallback #${maxPriority + 1}.`,
         });
         setApiKey("");
         fetchConfiguredProviders();
@@ -260,21 +267,27 @@ export const MarketDataSettings = () => {
     setIsLoading(false);
   };
 
-  const activeProvider = configuredProviders.find(p => p.is_active);
-
   return (
     <Card className="p-6 bg-card border-border">
       <div className="flex items-center gap-2 mb-4">
         <TrendingUp className="h-5 w-5 text-primary" />
-        <h3 className="text-lg font-semibold">Market Data Provider</h3>
+        <h3 className="text-lg font-semibold">Market Data Providers</h3>
+      </div>
+
+      {/* Priority Explanation */}
+      <div className="mb-4 p-3 bg-primary/10 rounded-lg border border-primary/20">
+        <p className="text-sm text-foreground">
+          <strong>Fallback System:</strong> Providers are tried in order (1st → 2nd → 3rd). 
+          If the first provider fails (rate limit, error), the next one is automatically used.
+        </p>
       </div>
 
       {/* Configured Providers List */}
       {configuredProviders.length > 0 && (
         <div className="mb-6 space-y-2">
-          <Label className="text-sm font-medium">Configured Providers</Label>
+          <Label className="text-sm font-medium">Provider Priority Order</Label>
           <div className="space-y-3">
-            {configuredProviders.map((config) => {
+            {configuredProviders.map((config, index) => {
               const providerLimit = providerRateLimits[config.provider];
               const rateInfo = rateLimits[config.id];
               const usagePercent = rateInfo 
@@ -288,14 +301,12 @@ export const MarketDataSettings = () => {
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
+                      <Badge variant="outline" className="text-xs font-mono">
+                        #{index + 1}
+                      </Badge>
                       <span className="font-medium text-sm">
                         {providerNames[config.provider] || config.provider}
                       </span>
-                      {config.is_active && (
-                        <Badge variant="default" className="text-xs">
-                          Primary
-                        </Badge>
-                      )}
                       {testResults[config.id] === "success" && (
                         <CheckCircle className="h-4 w-4 text-bullish" />
                       )}
@@ -303,7 +314,25 @@ export const MarketDataSettings = () => {
                         <XCircle className="h-4 w-4 text-destructive" />
                       )}
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleMovePriority(config.id, "up")}
+                        disabled={index === 0 || isLoading}
+                        className="h-7 w-7 p-0"
+                      >
+                        <ChevronUp className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleMovePriority(config.id, "down")}
+                        disabled={index === configuredProviders.length - 1 || isLoading}
+                        className="h-7 w-7 p-0"
+                      >
+                        <ChevronDown className="h-4 w-4" />
+                      </Button>
                       <Button
                         variant="outline"
                         size="sm"
@@ -316,22 +345,11 @@ export const MarketDataSettings = () => {
                           "Test"
                         )}
                       </Button>
-                      {!config.is_active && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleSetPrimary(config.id)}
-                          disabled={isLoading}
-                        >
-                          <Check className="h-3 w-3 mr-1" />
-                          Set Primary
-                        </Button>
-                      )}
                       <Button
                         variant="ghost"
                         size="sm"
                         onClick={() => handleDeleteProvider(config.id)}
-                        className="text-destructive hover:text-destructive"
+                        className="text-destructive hover:text-destructive h-7 w-7 p-0"
                       >
                         <Trash2 className="h-3 w-3" />
                       </Button>
@@ -355,11 +373,9 @@ export const MarketDataSettings = () => {
               );
             })}
           </div>
-          {activeProvider && (
-            <p className="text-xs text-muted-foreground mt-2">
-              Currently using: <span className="font-medium text-foreground">{providerNames[activeProvider.provider]}</span>
-            </p>
-          )}
+          <p className="text-xs text-muted-foreground mt-2">
+            Use ↑↓ arrows to reorder. First provider is tried first, fallbacks used on failure.
+          </p>
         </div>
       )}
 
@@ -380,7 +396,7 @@ export const MarketDataSettings = () => {
             </SelectContent>
           </Select>
           <p className="text-xs text-muted-foreground">
-            Select a provider to add or update its API key
+            Add multiple providers for automatic fallback support
           </p>
         </div>
 
@@ -400,15 +416,15 @@ export const MarketDataSettings = () => {
         </div>
 
         <Button type="submit" className="w-full" disabled={isLoading}>
-          {isLoading ? "Saving..." : "Save & Set as Primary"}
+          {isLoading ? "Saving..." : "Add Provider"}
         </Button>
       </form>
 
       <div className="mt-6 p-4 bg-background/50 rounded-lg">
         <h4 className="font-semibold mb-2 text-sm">Getting Started:</h4>
         <ul className="text-xs text-muted-foreground space-y-1">
+          <li>• Finnhub: <a href="https://finnhub.io/register" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Sign up for free</a> (60 calls/min) ⭐ Recommended</li>
           <li>• Alpha Vantage: <a href="https://www.alphavantage.co/support/#api-key" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Get free API key</a> (5 calls/min)</li>
-          <li>• Finnhub: <a href="https://finnhub.io/register" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Sign up for free</a> (60 calls/min)</li>
           <li>• IEX Cloud: <a href="https://iexcloud.io/cloud-login#/register" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Create account</a> (100 calls/sec)</li>
           <li>• Polygon.io: <a href="https://polygon.io/dashboard/signup" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Register here</a> (5 calls/min)</li>
           <li>• Massive.com: <a href="https://massive.com/dashboard/signup" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Sign up (Pro)</a> (5 calls/min)</li>
