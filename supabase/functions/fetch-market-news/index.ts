@@ -134,8 +134,34 @@ Deno.serve(async (req) => {
         };
         break;
 
+      case 'massive':
+      case 'polygon':
+        const polygonNewsUrl = `https://api.polygon.io/v2/reference/news?ticker=${symbol}&limit=10&apiKey=${config.api_key_encrypted}`;
+        const polygonResponse = await fetch(polygonNewsUrl);
+        const polygonData = await polygonResponse.json();
+        
+        if (polygonData.status === 'ERROR') {
+          throw new Error(polygonData.error || 'Polygon API error');
+        }
+
+        newsData = {
+          articles: (polygonData.results || []).map((item: any) => ({
+            title: item.title,
+            url: item.article_url,
+            time_published: item.published_utc,
+            authors: item.author ? [item.author] : [],
+            summary: item.description || '',
+            source: item.publisher?.name || 'Unknown',
+            sentiment: {
+              label: 'Neutral',
+              score: 0
+            }
+          }))
+        };
+        break;
+
       default:
-        throw new Error('Unsupported provider');
+        throw new Error(`Unsupported provider: ${config.provider}`);
     }
 
     console.log(`Successfully fetched ${newsData.articles.length} news articles`);
