@@ -5,6 +5,128 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+interface MarketData {
+  symbol: string;
+  price: number;
+  change: number;
+  changePercent: number;
+  volume: string;
+  timestamp: string;
+  provider?: string;
+}
+
+interface ProviderConfig {
+  id: string;
+  provider: string;
+  api_key_encrypted: string;
+  priority: number;
+}
+
+// Fetch data from a specific provider - returns data or throws error
+async function fetchFromProvider(symbol: string, config: ProviderConfig): Promise<MarketData> {
+  switch (config.provider) {
+    case 'alpha_vantage': {
+      const url = `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${symbol}&apikey=${config.api_key_encrypted}`;
+      const response = await fetch(url);
+      const data = await response.json();
+      
+      if (data['Global Quote']) {
+        const quote = data['Global Quote'];
+        return {
+          symbol: quote['01. symbol'],
+          price: parseFloat(quote['05. price']),
+          change: parseFloat(quote['09. change']),
+          changePercent: parseFloat(quote['10. change percent'].replace('%', '')),
+          volume: quote['06. volume'],
+          timestamp: quote['07. latest trading day'],
+          provider: 'alpha_vantage',
+        };
+      }
+      throw new Error('Invalid response from Alpha Vantage');
+    }
+      
+    case 'finnhub': {
+      const url = `https://finnhub.io/api/v1/quote?symbol=${symbol}&token=${config.api_key_encrypted}`;
+      const response = await fetch(url);
+      const data = await response.json();
+      
+      console.log('Finnhub response for', symbol, ':', JSON.stringify(data));
+      
+      if (data.error) {
+        throw new Error(`Finnhub API error: ${data.error}`);
+      }
+      
+      if (data.c !== undefined && data.c !== null && data.c !== 0) {
+        return {
+          symbol: symbol,
+          price: data.c,
+          change: data.d || 0,
+          changePercent: data.dp || 0,
+          volume: data.v?.toString() || 'N/A',
+          timestamp: new Date(data.t * 1000).toISOString(),
+          provider: 'finnhub',
+        };
+      }
+      throw new Error(`No data available for ${symbol}`);
+    }
+
+    case 'polygon':
+    case 'massive': {
+      const url = `https://api.polygon.io/v2/aggs/ticker/${symbol}/prev?adjusted=true&apiKey=${config.api_key_encrypted}`;
+      const response = await fetch(url);
+      const data = await response.json();
+      
+      console.log('Polygon/Massive response for', symbol, ':', JSON.stringify(data));
+      
+      if (data.status === 'ERROR' || data.error) {
+        throw new Error(`Polygon API error: ${data.error || data.message}`);
+      }
+      
+      if (data.results && data.results.length > 0) {
+        const result = data.results[0];
+        return {
+          symbol: symbol,
+          price: result.c,
+          change: result.c - result.o,
+          changePercent: ((result.c - result.o) / result.o) * 100,
+          volume: result.v?.toString() || 'N/A',
+          timestamp: new Date(result.t).toISOString(),
+          provider: config.provider,
+        };
+      }
+      throw new Error(`No data available for ${symbol}`);
+    }
+
+    case 'iex_cloud': {
+      const url = `https://cloud.iexapis.com/stable/stock/${symbol}/quote?token=${config.api_key_encrypted}`;
+      const response = await fetch(url);
+      const data = await response.json();
+      
+      console.log('IEX Cloud response for', symbol, ':', JSON.stringify(data));
+      
+      if (data.error) {
+        throw new Error(`IEX Cloud API error: ${data.error}`);
+      }
+      
+      if (data.latestPrice) {
+        return {
+          symbol: data.symbol,
+          price: data.latestPrice,
+          change: data.change || 0,
+          changePercent: data.changePercent ? data.changePercent * 100 : 0,
+          volume: data.volume?.toString() || 'N/A',
+          timestamp: data.latestUpdate ? new Date(data.latestUpdate).toISOString() : new Date().toISOString(),
+          provider: 'iex_cloud',
+        };
+      }
+      throw new Error(`No data available for ${symbol}`);
+    }
+      
+    default:
+      throw new Error(`Provider ${config.provider} not supported`);
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -45,14 +167,13 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Get user's active market data config (pick most recently updated if multiple)
+    // Get ALL user's market data configs ordered by priority
     const { data: configs, error: configError } = await supabase
       .from('market_data_configs')
-      .select('*')
+      .select('id, provider, api_key_encrypted, priority')
       .eq('user_id', user.id)
-      .eq('is_active', true)
-      .order('updated_at', { ascending: false })
-      .limit(1);
+      .not('api_key_encrypted', 'is', null)
+      .order('priority', { ascending: true });
 
     if (configError) {
       console.error('Config fetch error:', configError);
@@ -62,159 +183,44 @@ Deno.serve(async (req) => {
       );
     }
 
-    const config = configs && configs.length > 0 ? configs[0] : null;
-
-    if (!config || !config.api_key_encrypted) {
+    if (!configs || configs.length === 0) {
       return new Response(
         JSON.stringify({ 
-          error: 'No active market data provider configured. Please add an API key in Settings.' 
+          error: 'No market data providers configured. Please add an API key in Settings.' 
         }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+
+    // Try each provider in priority order until one succeeds
+    const errors: string[] = [];
     
-    console.log('Using provider:', config.provider);
-
-    // Fetch data based on provider
-    let marketData;
-    
-    switch (config.provider) {
-      case 'alpha_vantage':
-        const avUrl = `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${symbol}&apikey=${config.api_key_encrypted}`;
-        const avResponse = await fetch(avUrl);
-        const avData = await avResponse.json();
+    for (const config of configs) {
+      try {
+        console.log(`Trying provider: ${config.provider} (priority: ${config.priority})`);
+        const marketData = await fetchFromProvider(symbol, config as ProviderConfig);
         
-        if (avData['Global Quote']) {
-          const quote = avData['Global Quote'];
-          marketData = {
-            symbol: quote['01. symbol'],
-            price: parseFloat(quote['05. price']),
-            change: parseFloat(quote['09. change']),
-            changePercent: parseFloat(quote['10. change percent'].replace('%', '')),
-            volume: quote['06. volume'],
-            timestamp: quote['07. latest trading day'],
-          };
-        } else {
-          return new Response(
-            JSON.stringify({ error: 'Invalid response from Alpha Vantage' }),
-            { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-          );
-        }
-        break;
-        
-      case 'finnhub':
-        const fhUrl = `https://finnhub.io/api/v1/quote?symbol=${symbol}&token=${config.api_key_encrypted}`;
-        const fhResponse = await fetch(fhUrl);
-        const fhData = await fhResponse.json();
-        
-        console.log('Finnhub response for', symbol, ':', JSON.stringify(fhData));
-        
-        // Check for error response
-        if (fhData.error) {
-          return new Response(
-            JSON.stringify({ error: `Finnhub API error: ${fhData.error}` }),
-            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-          );
-        }
-        
-        // Check if we have valid price data
-        if (fhData.c !== undefined && fhData.c !== null && fhData.c !== 0) {
-          marketData = {
-            symbol: symbol,
-            price: fhData.c,
-            change: fhData.d || 0,
-            changePercent: fhData.dp || 0,
-            volume: fhData.v?.toString() || 'N/A',
-            timestamp: new Date(fhData.t * 1000).toISOString(),
-          };
-        } else {
-          return new Response(
-            JSON.stringify({ 
-              error: `No data available for ${symbol}. The symbol may be invalid or market is closed.` 
-            }),
-            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-          );
-        }
-        break;
-
-      case 'polygon':
-      case 'massive':
-        const pgUrl = `https://api.polygon.io/v2/aggs/ticker/${symbol}/prev?adjusted=true&apiKey=${config.api_key_encrypted}`;
-        const pgResponse = await fetch(pgUrl);
-        const pgData = await pgResponse.json();
-        
-        console.log('Polygon/Massive response for', symbol, ':', JSON.stringify(pgData));
-        
-        if (pgData.status === 'ERROR' || pgData.error) {
-          return new Response(
-            JSON.stringify({ error: `Polygon API error: ${pgData.error || pgData.message}` }),
-            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-          );
-        }
-        
-        if (pgData.results && pgData.results.length > 0) {
-          const result = pgData.results[0];
-          marketData = {
-            symbol: symbol,
-            price: result.c,
-            change: result.c - result.o,
-            changePercent: ((result.c - result.o) / result.o) * 100,
-            volume: result.v?.toString() || 'N/A',
-            timestamp: new Date(result.t).toISOString(),
-          };
-        } else {
-          return new Response(
-            JSON.stringify({ 
-              error: `No data available for ${symbol}. The symbol may be invalid.` 
-            }),
-            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-          );
-        }
-        break;
-
-      case 'iex_cloud':
-        const iexUrl = `https://cloud.iexapis.com/stable/stock/${symbol}/quote?token=${config.api_key_encrypted}`;
-        const iexResponse = await fetch(iexUrl);
-        const iexData = await iexResponse.json();
-        
-        console.log('IEX Cloud response for', symbol, ':', JSON.stringify(iexData));
-        
-        if (iexData.error) {
-          return new Response(
-            JSON.stringify({ error: `IEX Cloud API error: ${iexData.error}` }),
-            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-          );
-        }
-        
-        if (iexData.latestPrice) {
-          marketData = {
-            symbol: iexData.symbol,
-            price: iexData.latestPrice,
-            change: iexData.change || 0,
-            changePercent: iexData.changePercent ? iexData.changePercent * 100 : 0,
-            volume: iexData.volume?.toString() || 'N/A',
-            timestamp: iexData.latestUpdate ? new Date(iexData.latestUpdate).toISOString() : new Date().toISOString(),
-          };
-        } else {
-          return new Response(
-            JSON.stringify({ 
-              error: `No data available for ${symbol}.` 
-            }),
-            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-          );
-        }
-        break;
-        
-      default:
+        // Success! Return the data with provider info
+        console.log(`Success with provider: ${config.provider}`);
         return new Response(
-          JSON.stringify({ error: `Provider ${config.provider} not yet supported` }),
-          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          JSON.stringify(marketData),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
+      } catch (err) {
+        const errorMsg = err instanceof Error ? err.message : 'Unknown error';
+        console.log(`Provider ${config.provider} failed: ${errorMsg}`);
+        errors.push(`${config.provider}: ${errorMsg}`);
+        // Continue to next provider
+      }
     }
 
+    // All providers failed
     return new Response(
-      JSON.stringify(marketData),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      JSON.stringify({ 
+        error: 'All providers failed',
+        details: errors,
+      }),
+      { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
   } catch (error) {
